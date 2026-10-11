@@ -1,0 +1,16 @@
+[Unit]
+Description=Pithon Local SLM Daemon (Raspberry Pi 3)
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/Pithon
+ExecStart=/home/pi/Pithon/.venv/bin/pithon serve --port 8080 --model /home/pi/Pithon/models/qwen2.5-0.5b-instruct-q4_k_m.gguf --threads 3
+Restart=always
+RestartSec=5
+# Adjust OOM score to protect SSH daemon
+OOMScoreAdjust=500
+
+[Install]
+WantedBy=multi-user.target
