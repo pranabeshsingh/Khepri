@@ -29,11 +29,13 @@ class LlamaEngine:
         self,
         model_path: str,
         n_ctx: int = 2048,
+        n_batch: int = 128,
         n_threads: int = 3,
         mock_mode: bool = False
     ):
         self.model_path = model_path
         self.n_ctx = min(n_ctx, 2048)
+        self.n_batch = min(n_batch, self.n_ctx)
         self.n_threads = max(1, min(n_threads, 4))
         self.mock_mode = mock_mode or (model_path == ":mock:")
         self.model_type = detect_model_type(model_path)
@@ -52,6 +54,7 @@ class LlamaEngine:
             self.llm = Llama(
                 model_path=self.model_path,
                 n_ctx=self.n_ctx,
+                n_batch=self.n_batch,
                 n_threads=self.n_threads,
                 verbose=False
             )

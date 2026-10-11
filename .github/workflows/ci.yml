@@ -61,7 +61,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: models
-          key: pithon-models-${{ hashFiles('scripts/download_model.sh') }}-v1
+          key: pithon-models-${{ hashFiles('scripts/download_model.sh') }}-v2
 
       - name: Install Python dependencies
         run: |
@@ -70,7 +70,7 @@ jobs:
           pip install -r requirements-dev.txt
           pip install -e .
 
-      - name: Download test models (SmolLM-135M & Qwen2.5-0.5B)
+      - name: Download test models (SmolLM2 & Qwen2.5)
         if: steps.cache-models.outputs.cache-hit != 'true'
         run: |
           ./scripts/download_model.sh all models
@@ -79,10 +79,10 @@ jobs:
         run: |
           pytest tests/test_e2e_real_model.py -v -s
 
-      - name: CLI Sanity Check - Piped Stdin (SmolLM-135M)
+      - name: CLI Sanity Check - Piped Stdin (SmolLM2-135M)
         run: |
           echo "Oct 11 14:00:00 rpi kernel: [123.45] BUG: unable to handle page fault for address 00000000" | \
-            pithon pipe "What caused the crash?" --model models/smollm-135m-instruct-q4_k_m.gguf
+            pithon pipe "What caused the crash?" --model models/SmolLM2-135M-Instruct-Q4_K_M.gguf
 
       - name: CLI Sanity Check - Daemon & Curl Test (Qwen2.5-0.5B)
         run: |
