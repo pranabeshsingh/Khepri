@@ -144,18 +144,36 @@ class Scheduler:
 
         return digest
 
+    def daily_briefing_tick(self) -> str:
+        """Compile and send rich morning briefing to admin chat."""
+        from pithon.agent.briefing import generate_daily_briefing
+        briefing = generate_daily_briefing(self.admin_chat_id, self.storage, tz_name=self.tz_name)
+        if self.bot and self.admin_chat_id:
+            try:
+                self.bot.send_message(self.admin_chat_id, briefing)
+            except Exception as e:
+                logger.error(f"Failed to send scheduled daily briefing: {e}")
+        return briefing
+
     def _loop(self) -> None:
         last_hour = -1
+        last_briefing_date = None
         while self._running:
             try:
                 # 1. Minute tick for reminders
                 self.check_reminders_tick()
 
-                # 2. Hourly tick at :00
                 current_time = datetime.now(self._get_tz())
+
+                # 2. Hourly tick at :00
                 if current_time.minute == 0 and current_time.hour != last_hour:
                     last_hour = current_time.hour
                     self.hourly_digest_tick()
+
+                # 3. Morning Daily Briefing at 9:00 AM local time
+                if current_time.hour == 9 and current_time.minute == 0 and last_briefing_date != current_time.date():
+                    last_briefing_date = current_time.date()
+                    self.daily_briefing_tick()
 
             except Exception as e:
                 logger.error(f"Scheduler tick error: {e}")

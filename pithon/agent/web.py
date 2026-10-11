@@ -1209,6 +1209,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
         <!-- QUICK PROMPT PILLS -->
         <div class="chat-suggestions">
+          <span class="pill-prompt" onclick="setPrompt('/briefing')">📰 Daily Briefing (/briefing)</span>
           <span class="pill-prompt" onclick="setPrompt('How is the weather in Kolkata today?')">🌤️ Weather in Kolkata</span>
           <span class="pill-prompt" onclick="setPrompt('Calculate 25 * 18.5 + 40')">🧮 Safe calculate</span>
           <span class="pill-prompt" onclick="setPrompt('/timer 15m Pasta')">⏱️ Set 15m timer</span>
@@ -2024,6 +2025,11 @@ def create_web_server(
                     "telemetry": telemetry
                 })
 
+            elif path == "/api/briefing":
+                from pithon.agent.briefing import generate_daily_briefing
+                briefing_text = generate_daily_briefing(str(admin_id or "web"), storage, tz_name=tz_name)
+                self._send_json({"status": "ok", "briefing": briefing_text})
+
             elif path == "/api/chat/history":
                 since_id = 0
                 if "since_id" in query_params:
@@ -2173,6 +2179,11 @@ def create_web_server(
                     prof = storage.get_user_profile(str(admin_id or "web"))
                     if prof and prof.get("step"):
                         reply_text = handle_onboarding_step(str(admin_id or "web"), prompt, storage, tz_name=tz_name)
+
+                # 0b. Check /briefing command
+                if not reply_text and (prompt.startswith("/briefing") or prompt.lower().strip() in ("/briefing", "daily briefing", "briefing")):
+                    from pithon.agent.briefing import generate_daily_briefing
+                    reply_text = generate_daily_briefing(str(admin_id or "web"), storage, tz_name=tz_name)
 
                 # 1. Check direct weather intent
                 if not reply_text and is_weather_intent(prompt):

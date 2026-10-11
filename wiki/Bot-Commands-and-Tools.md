@@ -11,6 +11,11 @@ When configuring your bot in Telegram, open **[@BotFather](https://t.me/BotFathe
 ```text
 start - Open Khepri and view quick menu
 help - Show all commands and features
+briefing - Daily briefing (weather, top 10 news, facts, thought)
+init - Setup personal profile and preferences
+clear - Clear conversation context memory
+init - Setup personal profile and preferences
+clear - Clear conversation context memory
 time - Current date, time, and timezone
 tasks - View active tasks and reminders
 add - Add a new task or scheduled reminder
@@ -33,6 +38,9 @@ chat - Query local 0.5B AI model
 | :--- | :--- | :--- | :--- |
 | `/start` | `/start` | Open welcome greeting & quick interactive menu | Telegram API inline keyboard |
 | `/help` | `/help` | Display interactive cheat sheet & commands | In-memory reference card |
+| `/briefing` | `/briefing` | Daily briefing: weather, top 10 news (5 local, 3 national, 2 world), milestones, quote, tasks | Aggregated RSS & storage engine |
+| `/init` | `/init` | Setup onboarding profile wizard (name, location, preferences) | SQLite user profile engine |
+| `/clear` | `/clear` | Clear conversation context memory turns | SQLite context reset engine |
 | `/time` | `/time` | Current date, time, weekday, and configured timezone | Python `zoneinfo` temporal grounder |
 | `/tasks` | `/tasks` (or `/todo`) | List pending tasks and reminders with completion toggles | SQLite task store (`/app/data/pithon.db`) |
 | `/add` | `/add Deploy v0.2 tomorrow at 5pm` | Create a new task or schedule a reminder (or `/task`) | SQLite task store + natural parser |
@@ -47,6 +55,25 @@ chat - Query local 0.5B AI model
 | `/chat` | `/chat Explain TCP handshake in 3 bullets` | Direct query to local 0.5B SLM | `pithon-daemon` llama.cpp engine |
 
 ---
+
+---
+
+## 2b. Daily Briefing Engine (`/briefing`)
+
+Khepri generates a comprehensive daily briefing report combining multiple edge data sources:
+* **Personalized Header:** Addressed to the user's name from profile, exact date, and timezone.
+* **Home City Weather:** Live weather from `wttr.in` for the user's home location.
+* **Top 10 Curated Headlines:**
+  * 📍 **5 Local News** (tailored to user's registered city, e.g., Kolkata or Bengaluru)
+  * 🇮🇳 **3 National News** (India headlines)
+  * 🌐 **2 World News** (international headlines)
+  * Deduplicated across sections with zero external API keys needed.
+* **Interesting About Today:** Historical or scientific milestone for the calendar day.
+* **Thought for Today:** Curated inspiring quote and philosophical wisdom.
+* **Tasks & Schedule:** Count of pending items and top scheduled tasks.
+* **Edge Container Health:** System status and inference engine health.
+
+Triggerable manually via `/briefing`, via Telegram interactive buttons, Web Portal pill, or scheduled automatically every morning at 9:00 AM.
 
 ## 3. Natural Language Tool Calling
 

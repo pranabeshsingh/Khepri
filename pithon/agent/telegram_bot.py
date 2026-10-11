@@ -18,6 +18,7 @@ from pithon.agent.tasks import (
 from pithon.agent.calc import safe_calculate
 from pithon.agent.weather import get_weather_report, is_weather_intent, extract_weather_location
 from pithon.agent.memory import list_notes, save_note
+from pithon.agent.briefing import generate_daily_briefing
 from pithon.agent.profile import (
     start_onboarding,
     handle_onboarding_step,
@@ -167,6 +168,31 @@ class TelegramBot:
             updated_text = f"~~{current_text}~~\n\n🗑️ *Deleted.*"
             self.edit_message_text(chat_id, msg_id, updated_text, reply_markup={"inline_keyboard": []})
 
+        elif data == "menu:briefing":
+            self.answer_callback_query(cb_id, text="Generating daily briefing... 📰")
+            self.send_chat_action(chat_id, action="typing")
+            b_text = generate_daily_briefing(str(chat_id), self.storage, tz_name=self.tz_name)
+            self.send_message(chat_id, b_text)
+
+        elif data == "menu:tasks":
+            self.answer_callback_query(cb_id, text="Loading tasks... 📋")
+            if self.storage:
+                tasks = self.storage.get_tasks(str(chat_id))
+                out_text, inline_kb = format_tasks_message(tasks)
+                reply_markup = {"inline_keyboard": inline_kb} if inline_kb else None
+                self.send_message(chat_id, out_text, reply_markup=reply_markup)
+
+        elif data == "menu:time":
+            self.answer_callback_query(cb_id, text="Checking clock... 🕒")
+            info = get_current_time_info(self.tz_name)
+            time_msg = (
+                f"🕒 *Current Date & Time*\n\n"
+                f"• *Date:* {info['weekday']}, {info['day']} {info['month']} {info['year']}\n"
+                f"• *Time:* {info['time']} ({info['time_12h']})\n"
+                f"• *Timezone:* `{info['timezone']}` (UTC{info['utc_offset'][:3]}:{info['utc_offset'][3:]})"
+            )
+            self.send_message(chat_id, time_msg)
+
         else:
             self.answer_callback_query(cb_id)
 
@@ -184,6 +210,13 @@ class TelegramBot:
         self.send_chat_action(chat_id, action="typing")
 
         # 1. Fast-path Explicit Slash Commands
+        # Fast-path /briefing command
+        if text.startswith("/briefing"):
+            self.send_chat_action(chat_id, action="typing")
+            b_text = generate_daily_briefing(str(chat_id), self.storage, tz_name=self.tz_name)
+            self.send_message(chat_id, b_text)
+            return
+
         # Check /init command
         if text.startswith("/init"):
             arg = text[5:].strip()
@@ -205,6 +238,9 @@ class TelegramBot:
                 "👋 *Welcome to Khepri Assistant!*\n\n"
                 "I am your lightweight personal AI agent, grounded with live time, task management, and web search.\n\n"
                 "*Available Commands:*\n"
+                "• `/briefing` - Personalized daily briefing (weather, top 10 news, facts, thought)\n"
+                "• `/init` - Onboarding profile wizard (name, location, preferences)\n"
+                "• `/clear` or `/reset` - Clear conversational dialogue turns\n"
                 "• `/time` - Current date, time, and timezone\n"
                 "• `/todo` or `/tasks` - View active tasks & lists\n"
                 "• `/add <task>` - Create a new task or reminder\n"
@@ -212,15 +248,16 @@ class TelegramBot:
                 "• `/search <query>` - Run DuckDuckGo web search\n"
                 "• `/poll <question> [opt1] [opt2]` - Create interactive poll\n"
                 "• `/status` - System & model runtime health\n\n"
-                "_Or simply chat with me naturally (e.g. 'Set a timer for 15 mins')!_"
+                "_Or simply chat with me naturally (e.g. 'Give me today's briefing' or 'Set a timer for 15 mins')!_"
             )
             reply_markup = {
                 "inline_keyboard": [
                     [
-                        {"text": "📋 My Tasks", "callback_data": "menu:tasks"},
-                        {"text": "🕒 Date & Time", "callback_data": "menu:time"}
+                        {"text": "📰 Daily Briefing", "callback_data": "menu:briefing"},
+                        {"text": "📋 My Tasks", "callback_data": "menu:tasks"}
                     ],
                     [
+                        {"text": "🕒 Date & Time", "callback_data": "menu:time"},
                         {"text": "📊 Open Dashboard", "url": "https://khepri.trylocalhost.com"}
                     ]
                 ]

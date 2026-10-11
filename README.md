@@ -76,6 +76,9 @@ Khepri acts as an always-on personal companion through Telegram. You can execute
 | :--- | :--- | :--- |
 | `/start` | `/start` | Open welcome greeting & quick interactive menu |
 | `/help` | `/help` | Display interactive cheat sheet |
+| `/briefing` | `/briefing` | Daily briefing: weather, top 10 news (5 local, 3 national, 2 world), milestones, quote, tasks |
+| `/init` | `/init` | Setup onboarding profile wizard (name, home location, digest time, focus) |
+| `/clear` | `/clear` (or `/reset`) | Clear conversation context memory turns |
 | `/time` | `/time` | Current date, time, weekday, and configured timezone |
 | `/tasks` | `/tasks` (or `/todo`) | List pending tasks and reminders with completion toggles |
 | `/add` | `/add Deploy v0.2 tomorrow at 5pm` | Create a new task or scheduled reminder (or `/task`) |
@@ -97,6 +100,7 @@ Copy and send this directly to [@BotFather](https://t.me/BotFather) after typing
 ```text
 start - Open Khepri and view quick menu
 help - Show all commands and features
+briefing - Daily briefing (weather, top 10 news, facts, thought)
 init - Setup personal profile and preferences
 clear - Clear conversation context memory
 time - Current date, time, and timezone
@@ -114,6 +118,15 @@ chat - Query local 0.5B AI model
 ```
 
 </details>
+
+### 📰 Personalized Daily Briefings (`/briefing`)
+Triggered via `/briefing`, daily morning schedule (9:00 AM), or conversational queries (*"Give me today's briefing"*):
+* **Personalized Greeting & Temporal Grounding:** Greeted with name from profile, exact date & local timezone.
+* **Home City Weather:** Live temperature, condition, humidity, and wind.
+* **Top 10 Curated Headlines:** 5 local news (tailored to user city), 3 national (India), and 2 world news via deduplicated zero-key RSS feeds.
+* **Interesting About Today:** Historical or scientific milestone that happened on this day in history.
+* **Thought for Today:** Curated inspiring quote and philosophical wisdom.
+* **Tasks & Edge Health:** Active tasks overview and edge container health status.
 
 ### Natural Language Interceptors
 * **Weather:** *"How's the weather in Tokyo?"* ➔ Queries `wttr.in/Tokyo` directly, returning structured live metrics without web search hallucinations.

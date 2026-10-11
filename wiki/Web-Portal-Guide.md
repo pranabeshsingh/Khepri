@@ -62,3 +62,7 @@ server {
     # ssl_certificate and key paths...
 }
 ```
+
+
+### 📰 Daily Briefings
+Trigger `/briefing` directly from the chat suggestion pills or fetch JSON from `/api/briefing`.

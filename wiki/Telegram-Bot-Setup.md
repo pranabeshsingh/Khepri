@@ -55,6 +55,11 @@ Registering slash commands makes them appear in the native Telegram popup menu w
 ```text
 start - Open Khepri and view quick menu
 help - Show all commands and features
+briefing - Daily briefing (weather, top 10 news, facts, thought)
+init - Setup personal profile and preferences
+clear - Clear conversation context memory
+init - Setup personal profile and preferences
+clear - Clear conversation context memory
 time - Current date, time, and timezone
 tasks - View active tasks and reminders
 add - Add a new task or scheduled reminder

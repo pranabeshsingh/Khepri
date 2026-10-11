@@ -130,6 +130,19 @@ TOOLS_DEFINITIONS = [
                 "required": ["query"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_daily_briefing",
+            "description": "Generate comprehensive daily briefing with weather, top 10 news (local, national, world), historical milestones, quote of the day, and tasks",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {"type": "string", "description": "Optional city name to override default location"}
+                }
+            }
+        }
     }
 ]
 
@@ -304,5 +317,11 @@ def execute_tool_call(
         reply_markup = {"inline_keyboard": [url_buttons]} if url_buttons else None
         context_block = format_search_context(results, query)
         return "", reply_markup, {"type": "search", "query": query, "results": results, "context": context_block}
+
+    elif name == "get_daily_briefing":
+        from pithon.agent.briefing import generate_daily_briefing
+        override_city = args.get("city")
+        briefing = generate_daily_briefing(chat_id=chat_id, storage=storage, tz_name=tz_name, override_city=override_city)
+        return briefing, None, {"type": "briefing"}
 
     return f"Unknown tool: {name}", None, None
