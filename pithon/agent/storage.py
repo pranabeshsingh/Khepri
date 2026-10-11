@@ -79,11 +79,11 @@ class Storage:
     def log_interaction(
         self,
         chat_id: str,
-        user_id: Optional[str],
-        prompt: str,
-        search_query: Optional[str],
-        search_results: Optional[List[Dict[str, Any]]],
-        response: str,
+        user_id: Optional[str] = None,
+        prompt: str = '',
+        search_query: Optional[str] = None,
+        search_results: Optional[List[Dict[str, Any]]] = None,
+        response: str = '',
         latency_ms: int = 0
     ) -> int:
         """Log a user-model interaction."""

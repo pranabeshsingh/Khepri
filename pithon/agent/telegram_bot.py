@@ -1,4 +1,4 @@
-"""Interactive Telegram Bot router with inline keyboards, whitelist security, and poll support."""
+"""Interactive Telegram Bot router with inline keyboards, whitelist security, poll support, and native Qwen2.5 tool calling."""
 
 import json
 import logging
@@ -16,11 +16,16 @@ from pithon.agent.tasks import (
     format_tasks_message,
     format_reminder_alert
 )
+from pithon.agent.tools import (
+    format_tools_system_prompt,
+    extract_tool_call,
+    execute_tool_call
+)
 
 logger = logging.getLogger("pithon.telegram")
 
 class TelegramBot:
-    """Telegram Bot client with whitelist security and interactive keyboards."""
+    """Telegram Bot client with whitelist security, interactive keyboards, and tool calling."""
 
     def __init__(
         self,
@@ -50,7 +55,7 @@ class TelegramBot:
                 raw = resp.read().decode("utf-8")
                 return json.loads(raw)
         except Exception as e:
-            logger.error(f"Telegram API {method} error: {e}")
+            logger.error(f"Telegram API call error ({method}): {e}")
             return None
 
     def send_message(
@@ -60,37 +65,17 @@ class TelegramBot:
         reply_markup: Optional[Dict[str, Any]] = None,
         disable_notification: bool = False
     ) -> Optional[Dict[str, Any]]:
-        """Send a message, splitting into segments if exceeding 4000 characters."""
-        chunks = [text[i:i + 4000] for i in range(0, len(text), 4000)]
-        res = None
-        for idx, chunk in enumerate(chunks):
-            # Only attach reply_markup to the final chunk
-            markup = reply_markup if idx == len(chunks) - 1 else None
-            payload = {
-                "chat_id": chat_id,
-                "text": chunk,
-                "parse_mode": "Markdown",
-                "disable_notification": disable_notification
-            }
-            if markup:
-                payload["reply_markup"] = markup
-            res = self._call_api("sendMessage", payload)
-            if not res or not res.get("ok"):
-                # Fallback without Markdown if parsing fails
-                payload.pop("parse_mode", None)
-                res = self._call_api("sendMessage", payload)
-        return res
-
-    def send_chat_action(self, chat_id: Any, action: str = "typing") -> None:
-        """Send chat action indicator (typing, etc.)."""
-        self._call_api("sendChatAction", {"chat_id": chat_id, "action": action}, timeout=5.0)
-
-    def answer_callback_query(self, callback_query_id: str, text: Optional[str] = None) -> None:
-        """Acknowledge an interactive button press."""
-        payload: Dict[str, Any] = {"callback_query_id": callback_query_id}
-        if text:
-            payload["text"] = text
-        self._call_api("answerCallbackQuery", payload, timeout=5.0)
+        """Send a markdown message to a Telegram chat."""
+        payload: Dict[str, Any] = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "Markdown",
+            "disable_web_page_preview": False,
+            "disable_notification": disable_notification
+        }
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+        return self._call_api("sendMessage", payload)
 
     def edit_message_text(
         self,
@@ -99,7 +84,7 @@ class TelegramBot:
         text: str,
         reply_markup: Optional[Dict[str, Any]] = None
     ) -> Optional[Dict[str, Any]]:
-        """Edit an existing message in-place."""
+        """Edit an existing message for interactive button updates."""
         payload: Dict[str, Any] = {
             "chat_id": chat_id,
             "message_id": message_id,
@@ -108,14 +93,22 @@ class TelegramBot:
         }
         if reply_markup is not None:
             payload["reply_markup"] = reply_markup
-        res = self._call_api("editMessageText", payload, timeout=10.0)
-        if not res or not res.get("ok"):
-            payload.pop("parse_mode", None)
-            res = self._call_api("editMessageText", payload, timeout=10.0)
-        return res
+        return self._call_api("editMessageText", payload)
+
+    def answer_callback_query(self, callback_query_id: str, text: Optional[str] = None) -> None:
+        """Acknowledge Telegram button click."""
+        payload: Dict[str, Any] = {"callback_query_id": callback_query_id}
+        if text:
+            payload["text"] = text
+        self._call_api("answerCallbackQuery", payload)
+
+    def send_chat_action(self, chat_id: Any, action: str = "typing") -> None:
+        """Indicate bot is typing or thinking."""
+        payload = {"chat_id": chat_id, "action": action}
+        self._call_api("sendChatAction", payload)
 
     def send_poll(self, chat_id: Any, question: str, options: List[str]) -> Optional[Dict[str, Any]]:
-        """Create a native Telegram poll."""
+        """Dispatch a native Telegram poll."""
         payload = {
             "chat_id": chat_id,
             "question": question,
@@ -182,21 +175,21 @@ class TelegramBot:
 
         self.send_chat_action(chat_id, action="typing")
 
-        # 1. Commands Handling
+        # 1. Fast-path Explicit Slash Commands
         if text.startswith("/start") or text.startswith("/help"):
             help_text = (
                 "👋 *Welcome to Pithon Assistant!*\n\n"
-                "I am your lightweight personal AI agent, grounded with live time and web search.\n\n"
+                "I am your lightweight personal AI agent, grounded with live time, task management, and web search.\n\n"
                 "*Available Commands:*\n"
                 "• `/time` - Current date, time, and timezone\n"
                 "• `/todo` or `/tasks` - View active tasks & lists\n"
                 "• `/add <task>` - Create a new task or reminder\n"
+                "• `/timer <duration> [label]` - Start a countdown timer\n"
                 "• `/search <query>` - Run DuckDuckGo web search\n"
                 "• `/poll <question> [opt1] [opt2]` - Create interactive poll\n"
                 "• `/status` - System & model runtime health\n\n"
-                "_Or simply chat with me naturally!_"
+                "_Or simply chat with me naturally (e.g. 'Set a timer for 15 mins')!_"
             )
-            # Attach quick-action menu
             reply_markup = {
                 "inline_keyboard": [
                     [
@@ -254,8 +247,33 @@ class TelegramBot:
                 )
             return
 
+        if text.startswith("/timer"):
+            task_info = parse_task_text(text, default_tz=self.tz_name)
+            if self.storage and task_info.get("due_at"):
+                tid = self.storage.create_task(
+                    str(chat_id),
+                    task_info["title"],
+                    list_name="timer",
+                    due_at=task_info["due_at"]
+                )
+                due_clean = task_info["due_at"][:19].replace("T", " ")
+                reply_markup = {
+                    "inline_keyboard": [
+                        [{"text": "❌ Cancel Timer", "callback_data": f"del:{tid}"}]
+                    ]
+                }
+                msg_text = (
+                    f"⏱️ *Timer Started!*\n\n"
+                    f"📌 *Timer:* {task_info['title']}\n"
+                    f"🕒 *Alert at:* `{due_clean} {self.tz_name}`\n\n"
+                    f"_I will alert you as soon as time is up!_"
+                )
+                self.send_message(chat_id, msg_text, reply_markup=reply_markup)
+            else:
+                self.send_message(chat_id, "Usage: `/timer 15m Pasta` or `/timer 30s Quick check`")
+            return
+
         if text.startswith("/poll"):
-            # Syntax: /poll "Question" "Option 1" "Option 2"
             matches = re.findall(r'"([^"]+)"', text)
             if len(matches) >= 3:
                 q = matches[0]
@@ -277,10 +295,58 @@ class TelegramBot:
             self.send_message(chat_id, status_text)
             return
 
-        # 2. Check Natural Language Task & Timer Intent
+        # 2. Conversational Intent via Native Qwen2.5 Tool Calling & Temporal Grounding
+        tools_system = format_tools_system_prompt()
+        temporal_header = format_temporal_prompt_header(self.tz_name)
+        system_prompt = f"{tools_system}\n\n{temporal_header}"
+
+        start_t = time.time()
+        answer = self._query_daemon(text, system=system_prompt)
+        latency_ms = int((time.time() - start_t) * 1000)
+
+        # Check for Native Qwen2.5 Tool Call
+        tool_call = extract_tool_call(answer)
+        if tool_call:
+            tool_name = tool_call.get("name")
+            if tool_name == "web_search":
+                search_query = tool_call.get("arguments", {}).get("query", text)
+                _, url_markup, ctx = execute_tool_call(tool_call, self.storage, str(chat_id), self.tz_name)
+                # Second turn: Generate final answer grounded on search context
+                grounded_prompt = (
+                    f"{ctx.get('context', '')}\n\n"
+                    f"User Question: {text}\n"
+                    f"Answer concisely based on the search context above."
+                )
+                grounded_answer = self._query_daemon(grounded_prompt, system=temporal_header)
+                if self.storage:
+                    self.storage.log_interaction(
+                        chat_id=str(chat_id),
+                        user_id=str(msg.get("from", {}).get("id", "")),
+                        prompt=text,
+                        search_query=search_query,
+                        search_results=ctx.get("results"),
+                        response=grounded_answer,
+                        latency_ms=latency_ms
+                    )
+                self.send_message(chat_id, grounded_answer, reply_markup=url_markup)
+                return
+            elif tool_name in ("set_timer", "add_task"):
+                reply_text, reply_markup, ctx = execute_tool_call(tool_call, self.storage, str(chat_id), self.tz_name)
+                if self.storage:
+                    self.storage.log_interaction(
+                        chat_id=str(chat_id),
+                        user_id=str(msg.get("from", {}).get("id", "")),
+                        prompt=text,
+                        response=reply_text,
+                        latency_ms=latency_ms
+                    )
+                self.send_message(chat_id, reply_text, reply_markup=reply_markup)
+                return
+
+        # 3. Fallback: Catch conversational task/timer patterns if model didn't emit a tool call
         if is_task_intent(text):
             task_info = parse_task_text(text, default_tz=self.tz_name)
-            if self.storage:
+            if self.storage and (task_info.get("seconds", 0) > 0 or task_info.get("due_at")):
                 tid = self.storage.create_task(
                     str(chat_id),
                     task_info["title"],
@@ -315,59 +381,53 @@ class TelegramBot:
                     )
                 return
 
-        # 3. DuckDuckGo Search & LLM Inference Pipeline
-        search_query = None
-        search_results = None
-        inline_keyboard = []
-
+        # 4. Fallback search detection if model didn't tool call but explicitly requested search
         if should_search(text):
             search_query = re.sub(r"^/(search|web)\s+", "", text, flags=re.IGNORECASE)
             search_results = search_duckduckgo(search_query, max_results=3)
-
-            # Build source URL buttons
             url_buttons = []
-            for idx, r in enumerate(search_results, 1):
+            for r in search_results:
                 if r.get("url"):
                     domain = urllib.parse.urlparse(r["url"]).netloc.replace("www.", "")
                     url_buttons.append({"text": f"🌐 {domain[:18]}", "url": r["url"]})
-            if url_buttons:
-                inline_keyboard.append(url_buttons)
+            reply_markup = {"inline_keyboard": [url_buttons]} if url_buttons else None
+            search_block = format_search_context(search_results, search_query)
+            grounded_prompt = f"{search_block}\n\nUser Question: {text}\nAnswer concisely."
+            answer = self._query_daemon(grounded_prompt, system=temporal_header)
+            if self.storage:
+                self.storage.log_interaction(
+                    chat_id=str(chat_id),
+                    user_id=str(msg.get("from", {}).get("id", "")),
+                    prompt=text,
+                    search_query=search_query,
+                    search_results=search_results,
+                    response=answer,
+                    latency_ms=latency_ms
+                )
+            self.send_message(chat_id, answer, reply_markup=reply_markup)
+            return
 
-        # Assemble Prompt with Temporal & Search Grounding
-        temporal_header = format_temporal_prompt_header(self.tz_name)
-        search_block = format_search_context(search_results, search_query) if search_results else ""
-
-        full_prompt = (
-            f"{temporal_header}\n"
-            f"{search_block}"
-            f"User Question: {text}\n"
-            f"Answer concisely and directly."
-        )
-
-        start_t = time.time()
-        answer = self._query_daemon(full_prompt)
-        latency_ms = int((time.time() - start_t) * 1000)
-
-        # Audit log in SQLite
+        # 5. Direct conversational response
         if self.storage:
             self.storage.log_interaction(
                 chat_id=str(chat_id),
                 user_id=str(msg.get("from", {}).get("id", "")),
                 prompt=text,
-                search_query=search_query,
-                search_results=search_results,
                 response=answer,
                 latency_ms=latency_ms
             )
+        self.send_message(chat_id, answer)
 
-        reply_markup = {"inline_keyboard": inline_keyboard} if inline_keyboard else None
-        self.send_message(chat_id, answer, reply_markup=reply_markup)
-
-    def _query_daemon(self, prompt: str) -> str:
+    def _query_daemon(self, prompt: str, system: Optional[str] = None) -> str:
         """Call Pithon daemon on 127.0.0.1:8090."""
         url = f"{self.daemon_url}/v1/chat/completions"
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
         payload = {
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
             "max_tokens": 512,
             "temperature": 0.2
         }
