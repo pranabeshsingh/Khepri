@@ -90,3 +90,71 @@ def test_callback_query_done(bot, mock_storage):
         mock_ans.assert_called_once_with("cb123", text="Task marked complete! ✅")
         mock_edit.assert_called_once()
         assert mock_storage.get_task_by_id(tid)["is_completed"] == 1
+
+def test_tool_call_timer(bot, mock_storage):
+    tool_xml = """<tool_call>
+{"name": "set_timer", "arguments": {"duration": 15, "unit": "minutes", "label": "Boil Eggs"}}
+</tool_call>"""
+    msg = {
+        "message_id": 30,
+        "chat": {"id": 357035668},
+        "from": {"id": 357035668},
+        "text": "Can you set a timer for 15 mins to boil eggs?"
+    }
+    with patch.object(bot, "_query_daemon", return_value=tool_xml), \
+         patch.object(bot, "send_message") as mock_send:
+        bot.handle_message(msg)
+        mock_send.assert_called_once()
+        args, kwargs = mock_send.call_args
+        assert "Timer Started!" in args[1]
+        assert "Boil Eggs" in args[1]
+        assert "reply_markup" in kwargs
+        assert "inline_keyboard" in kwargs["reply_markup"]
+
+        # Verify task created in database
+        tasks = mock_storage.get_tasks("357035668")
+        assert len(tasks) == 1
+        assert tasks[0]["title"] == "Boil Eggs"
+        assert tasks[0]["list_name"] == "timer"
+
+def test_tool_call_task(bot, mock_storage):
+    tool_xml = """<tool_call>
+{"name": "add_task", "arguments": {"title": "Buy oat milk", "list_name": "groceries"}}
+</tool_call>"""
+    msg = {
+        "message_id": 31,
+        "chat": {"id": 357035668},
+        "from": {"id": 357035668},
+        "text": "Add buy oat milk to my groceries list"
+    }
+    with patch.object(bot, "_query_daemon", return_value=tool_xml), \
+         patch.object(bot, "send_message") as mock_send:
+        bot.handle_message(msg)
+        mock_send.assert_called_once()
+        args, kwargs = mock_send.call_args
+        assert "Buy oat milk" in args[1]
+        assert "[groceries]" in args[1]
+        tasks = mock_storage.get_tasks("357035668")
+        assert len(tasks) == 1
+        assert tasks[0]["title"] == "Buy oat milk"
+        assert tasks[0]["list_name"] == "groceries"
+
+def test_tool_call_web_search(bot):
+    tool_xml = """<tool_call>
+{"name": "web_search", "arguments": {"query": "Mars rover status"}}
+</tool_call>"""
+    msg = {
+        "message_id": 32,
+        "chat": {"id": 357035668},
+        "from": {"id": 357035668},
+        "text": "What is the latest status of Mars rover?"
+    }
+    with patch.object(bot, "_query_daemon", side_effect=[tool_xml, "Perseverance is currently exploring Jezero Crater."]), \
+         patch("pithon.agent.tools.search_duckduckgo", return_value=[{"title": "NASA Mars", "snippet": "Active", "url": "https://mars.nasa.gov"}]), \
+         patch.object(bot, "send_message") as mock_send:
+        bot.handle_message(msg)
+        mock_send.assert_called_once()
+        args, kwargs = mock_send.call_args
+        assert "Perseverance is currently exploring" in args[1]
+        assert "reply_markup" in kwargs
+        assert kwargs["reply_markup"]["inline_keyboard"][0][0]["url"] == "https://mars.nasa.gov"
