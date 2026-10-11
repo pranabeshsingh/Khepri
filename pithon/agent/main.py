@@ -90,7 +90,8 @@ def main() -> None:
         daemon_url=daemon_url,
         tz_name=tz_name,
         admin_id=admin_chat_id,
-        report_id=report_chat_id
+        report_id=report_chat_id,
+        bot=bot
     )
 
     try:

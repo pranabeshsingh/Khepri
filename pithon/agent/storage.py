@@ -131,6 +131,67 @@ class Storage:
                 res.append(item)
             return res
 
+    def get_recent_history(
+        self,
+        limit: int = 6,
+        chat_id: Optional[str] = None
+    ) -> List[Dict[str, str]]:
+        """Retrieve recent interaction turns in chronological order for conversational multi-turn context."""
+        with self._lock, self._get_connection() as conn:
+            if chat_id:
+                query = """
+                SELECT prompt, response FROM interactions
+                WHERE (chat_id = ? OR chat_id = 'web' OR user_id = 'web')
+                  AND prompt != '' AND response != ''
+                ORDER BY id DESC LIMIT ?
+                """
+                rows = conn.execute(query, (str(chat_id), limit)).fetchall()
+            else:
+                query = """
+                SELECT prompt, response FROM interactions
+                WHERE prompt != '' AND response != ''
+                ORDER BY id DESC LIMIT ?
+                """
+                rows = conn.execute(query, (limit,)).fetchall()
+
+            history = []
+            for r in reversed(rows):
+                history.append({"role": "user", "content": r["prompt"]})
+                history.append({"role": "assistant", "content": r["response"]})
+            return history
+
+    def get_chat_stream(
+        self,
+        limit: int = 40,
+        since_id: int = 0
+    ) -> List[Dict[str, Any]]:
+        """Retrieve interactions stream for live chat synchronization between Telegram and Web."""
+        with self._lock, self._get_connection() as conn:
+            if since_id > 0:
+                query = """
+                SELECT id, chat_id, user_id, prompt, response, search_query, latency_ms, created_at
+                FROM interactions
+                WHERE id > ? AND prompt != '' AND response != ''
+                ORDER BY id ASC LIMIT ?
+                """
+                rows = conn.execute(query, (since_id, limit)).fetchall()
+            else:
+                query = """
+                SELECT id, chat_id, user_id, prompt, response, search_query, latency_ms, created_at
+                FROM interactions
+                WHERE prompt != '' AND response != ''
+                ORDER BY id DESC LIMIT ?
+                """
+                rows = conn.execute(query, (limit,)).fetchall()
+                rows = list(reversed(rows))
+
+            res = []
+            for r in rows:
+                item = dict(r)
+                item["source"] = "web" if item.get("user_id") == "web" or item.get("chat_id") == "web" else "telegram"
+                res.append(item)
+            return res
+
     def create_task(
         self,
         chat_id: str,
