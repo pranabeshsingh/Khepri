@@ -180,6 +180,16 @@ class Storage:
             row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
             return dict(row) if row else None
 
+    def toggle_task(self, task_id: int) -> Optional[bool]:
+        """Toggle task completion state (returns new is_completed boolean)."""
+        with self._lock, self._get_connection() as conn:
+            row = conn.execute("SELECT is_completed FROM tasks WHERE id = ?", (task_id,)).fetchone()
+            if not row:
+                return None
+            new_state = 0 if row["is_completed"] else 1
+            conn.execute("UPDATE tasks SET is_completed = ? WHERE id = ?", (new_state, task_id))
+            return bool(new_state)
+
     def complete_task(self, task_id: int) -> bool:
         """Mark task as completed."""
         with self._lock, self._get_connection() as conn:

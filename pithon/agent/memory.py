@@ -121,8 +121,11 @@ def list_notes(base_dir: Optional[str] = None) -> List[Dict[str, Any]]:
 def get_note_content(title_or_slug: str, base_dir: Optional[str] = None) -> Optional[str]:
     """Fetch exact text of a note file."""
     notes_dir = get_notes_dir(base_dir)
-    slug = _slugify(title_or_slug)
-    filepath = os.path.join(notes_dir, f"{slug}.md")
+    if title_or_slug.endswith(".md"):
+        filepath = os.path.join(notes_dir, title_or_slug)
+    else:
+        slug = _slugify(title_or_slug)
+        filepath = os.path.join(notes_dir, f"{slug}.md")
     if os.path.exists(filepath):
         try:
             with open(filepath, "r", encoding="utf-8") as f:
@@ -130,3 +133,21 @@ def get_note_content(title_or_slug: str, base_dir: Optional[str] = None) -> Opti
         except Exception:
             return None
     return None
+
+def delete_note(filename_or_title: str, base_dir: Optional[str] = None) -> bool:
+    """Delete a markdown note file."""
+    notes_dir = get_notes_dir(base_dir)
+    if filename_or_title.endswith(".md"):
+        filepath = os.path.join(notes_dir, filename_or_title)
+    else:
+        slug = _slugify(filename_or_title)
+        filepath = os.path.join(notes_dir, f"{slug}.md")
+    if os.path.exists(filepath):
+        try:
+            os.remove(filepath)
+            logger.info(f"Deleted note {filepath}")
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to delete {filepath}: {e}")
+            return False
+    return False

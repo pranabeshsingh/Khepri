@@ -88,7 +88,9 @@ def main() -> None:
         host="0.0.0.0",
         port=port,
         daemon_url=daemon_url,
-        tz_name=tz_name
+        tz_name=tz_name,
+        admin_id=admin_chat_id,
+        report_id=report_chat_id
     )
 
     try:
