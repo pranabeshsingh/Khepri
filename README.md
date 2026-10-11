@@ -1,167 +1,193 @@
-# Pithon
+<div align="center">
+  <img src="assets/khepri-logo.svg" alt="Khepri Logo" width="130" height="130" />
+  <h1>Khepri</h1>
+  <p><strong>Autonomous Small Language Model (SLM) Runtime & Personal Agent for ARM & Low-Power Hardware</strong></p>
 
-**Ultra-lightweight Small Language Model runtime engineered for Raspberry Pi 3.**
+  <p>
+    <a href="https://github.com/pranabeshsingh/Khepri/actions/workflows/ci.yml"><img src="https://github.com/pranabeshsingh/Khepri/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
+    <a href="https://github.com/pranabeshsingh/Khepri/actions/workflows/docker.yml"><img src="https://github.com/pranabeshsingh/Khepri/actions/workflows/docker.yml/badge.svg" alt="Docker Build CI" /></a>
+    <a href="https://github.com/pranabeshsingh/Khepri/actions/workflows/security.yml"><img src="https://github.com/pranabeshsingh/Khepri/actions/workflows/security.yml/badge.svg" alt="Security Scan" /></a>
+    <a href="https://github.com/pranabeshsingh/Khepri/actions/workflows/codeql.yml"><img src="https://github.com/pranabeshsingh/Khepri/actions/workflows/codeql.yml/badge.svg" alt="CodeQL" /></a>
+    <img src="https://img.shields.io/badge/RAM_Budget-%3C_550_MB_RSS-06b6d4" alt="RAM Budget" />
+    <img src="https://img.shields.io/badge/Python-3.10_%7C_3.11_%7C_3.12-38bdf8" alt="Python Versions" />
+    <img src="https://img.shields.io/badge/License-Apache--2.0-fbbf24" alt="License" />
+  </p>
 
-Run a 0.5B instruction-tuned model locally in under **350 MB RAM** on a 1.2 GHz ARM Cortex-A53 CPU. Pithon is designed for resource-constrained edge devices to handle piped log analysis, simple weather formatting, and task reminder parsing with low memory overhead.
-
----
-
-## Why Pithon on Raspberry Pi 3?
-
-* **Strict Memory Budget (< 550 MB RSS)**: Runs comfortably within the Pi 3's 1 GB RAM, keeping 450+ MB free for Raspberry Pi OS to avoid MicroSD swap thrashing.
-* **In-Memory GGUF**: Unlike MoE streaming across NVMe SSDs, a 0.5B model is fully memory-mapped in RAM, eliminating MicroSD read latency during token generation.
-* **CPU Core Allocation**: Computes on 3 threads by default (`--threads 3`), reserving 1 core for SSH and background OS responsiveness.
-* **Three Operational Modes**:
-  1. **Log Piping (`pithon pipe`)**: Ingest logs from `stdin` (`journalctl`, `syslog`), auto-budget context, diagnose errors, and exit.
-  2. **Interactive Chat (`pithon chat`)**: Multi-turn terminal REPL over SSH.
-  3. **Loopback Daemon (`pithon serve`)**: OpenAI-compatible `/v1/chat/completions` API server with loopback security.
-
----
-
-## Quickstart
-
-### 1. Installation on Raspberry Pi
-
-```bash
-# Clone the repository
-git clone https://github.com/pranabesh/Pithon.git
-cd Pithon
-
-# Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install llama-cpp-python with ARM NEON acceleration
-pip install --upgrade pip
-pip install llama-cpp-python
-pip install -e .
-```
-
-### 2. Download the Model (~350 MB)
-
-```bash
-./scripts/download_model.sh
-```
-This fetches `qwen2.5-0.5b-instruct-q4_k_m.gguf` from Hugging Face into `./models/`.
+  <p>
+    <a href="wiki/Home.md"><strong>Explore the Wiki »</strong></a> •
+    <a href="wiki/Telegram-Bot-Setup.md">Telegram Setup</a> •
+    <a href="wiki/Bot-Commands-and-Tools.md">Commands & Tools</a> •
+    <a href="wiki/Web-Portal-Guide.md">Management Portal</a> •
+    <a href="wiki/Architecture-and-Deployment.md">Architecture</a>
+  </p>
+</div>
 
 ---
 
-## Usage
+<p align="center">
+  <img src="assets/khepri-cover.jpg" alt="Khepri Concept Banner" width="600" />
+</p>
 
-### 1. Piped Log Analysis
+## Overview
 
-Analyze system logs or application output directly from the command line:
+**Khepri** (*named after the ancient solar scarab rolling dawn intelligence*) is an ultra-lightweight autonomous AI runtime engineered for resource-constrained edge environments (Raspberry Pi 3/4/5) and low-resource cloud VPS instances (Oracle Cloud 2-core ARM Ampere A1, Hetzner, AWS Graviton).
 
-```bash
-# Diagnose recent systemd service errors
-journalctl -u nginx -n 50 | pithon pipe "What caused the failure?"
+It pairs an in-memory **0.5B instruction-tuned SLM** with a full-fledged **personal agent**:
+* 🤖 **Telegram Assistant:** Whitelisted private bot with native tool calling, background scheduler, and hourly digests.
+* 🖥️ **Management Portal:** Premium frosted glassmorphism dark-mode UI with live hardware telemetry, web chat, task kanban, and markdown memory editor.
+* 🛠️ **Deterministic Tools:** Live weather (`wttr.in`), exact AST math parsing, scheduled reminders, and DuckDuckGo instant search with zero cloud API keys.
+* 🧠 **Markdown Memory:** Stores knowledge persistently in structured markdown files (`data/notes/*.md`).
+* 🔒 **Zero Resource Starvation:** Strict Linux cgroup CPU & RAM caps guarantee uninterrupted operation for co-located workloads (OwnTracks, MQTT brokers, databases).
 
-# Diagnose syslog using the log-analyzer preset
-cat /var/log/syslog | pithon pipe --preset log-analyzer
+---
+
+## Architecture
+
 ```
-
-**Built-in Task Presets:**
-* `--preset log-analyzer`: Focuses on error codes, timestamps, and root causes in 3 concise bullet points.
-* `--preset reminder`: Parses natural language tasks into structured JSON (`{"task": ..., "time": ...}`).
-* `--preset weather`: Summarizes weather observation data into 2 actionable sentences.
-
-### 2. Interactive Terminal Chat
-
-Start an interactive chat session inside your SSH terminal:
-
-```bash
-pithon chat
-```
-
-Special commands inside the chat:
-* `/clear` — Reset conversation history
-* `/exit` or `/quit` — Exit chat session
-
-### 3. Background OpenAI API Server
-
-Start a background server on `127.0.0.1:8080`:
-
-```bash
-pithon serve --port 8080
-```
-
-You can now query it using `curl` or any OpenAI-compatible client:
-
-```bash
-curl http://127.0.0.1:8080/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "messages": [{"role": "user", "content": "What is 25 Celsius in Fahrenheit?"}],
-    "stream": false
-  }'
-```
-
-Check system status and memory:
-```bash
-curl http://127.0.0.1:8080/health
+                    +---------------------------------------------------+
+                    |                 Host Server / OS                  |
+                    | (Nginx Reverse Proxy / Let's Encrypt SSL / Ports) |
+                    +-------------------------+-------------------------+
+                                              |
+                   Loopback :8091             |       Loopback :8090
+                         |                    |             |
+           +-------------v-------------+      |      +------v--------------------+
+           |       Khepri Agent        |      |      |       Khepri Daemon       |
+           |    (Python Microservice)  |      |      |     (C++ llama.cpp)       |
+           |                           |      |      |                           |
+           | - Telegram Bot Polling    |      |      | - Qwen2.5-0.5B GGUF Model |
+           | - Tool Interceptors       |      |      | - In-Memory mmap Tensor   |
+           | - Background Cron Task    +----->+----->+ - OpenAI-compatible API   |
+           | - SQLite DB (/app/data)   | HTTP Loopback | - Strict Host Whitelist |
+           | - Markdown Notes (/notes) |  JSON API   | - 2 Threads / Batch 128   |
+           | - Frosted Glass Web UI    |             +---------------------------+
+           +---------------------------+
 ```
 
 ---
 
-## Running as a systemd Service on the Pi
+## Telegram Bot & Native Tools
 
-To have Pithon run automatically on boot:
+Khepri acts as an always-on personal companion through Telegram. You can execute slash commands or simply speak in natural language.
 
-```bash
-sudo cp scripts/pithon.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now pithon
-```
+### Supported Commands
 
-Check service status:
-```bash
-systemctl status pithon
-```
+| Command | Syntax | Description |
+| :--- | :--- | :--- |
+| `/chat` | `/chat Explain Raft consensus in 3 sentences` | Prompt local 0.5B SLM |
+| `/task` | `/task Renew SSL certificate in 30m` | Schedule reminder/timer |
+| `/tasks` | `/tasks` | Interactive task list & status |
+| `/weather` | `/weather Kolkata` | Live temperature, humidity & wind (`wttr.in`) |
+| `/calc` | `/calc (450 * 1.18) + 32` | Safe arithmetic evaluation |
+| `/note` | `/note Server: Oracle ARM 24GB` | Save persistent markdown note |
+| `/search` | `/search Docker cgroup memory limit` | Search local notes + DuckDuckGo web |
+| `/status` | `/status` | System health, RAM RSS, active tasks, uptime |
+| `/help` | `/help` | Interactive cheat sheet |
 
----
+### Natural Language Interceptors
+* **Weather:** *"How's the weather in Tokyo?"* ➔ Queries `wttr.in/Tokyo` directly, returning structured live metrics without web search hallucinations.
+* **Math:** *"What is 1024 * 64?"* ➔ Evaluated deterministically with 100% precision.
+* **Reminders:** *"Remind me to check server logs in 20 minutes"* ➔ Grounded target timestamp computed and scheduled automatically.
 
-## Development & Testing
-
-Run the test suite:
-```bash
-.venv/bin/pytest tests/ -v
-```
-
-Pithon includes a mock mode (`--mock`) allowing all commands and servers to be tested without downloading model weights:
-```bash
-echo "Test log" | pithon pipe --mock
-pithon chat --mock
-pithon serve --mock
-```
+> 📖 **Full Setup Instructions:** See the [Telegram Bot Setup Guide](wiki/Telegram-Bot-Setup.md).
 
 ---
 
----
+## Quickstart with Docker Compose
 
-## Docker Deployment (Resource-Constrained Multi-Service Hosts)
+The recommended deployment method uses Docker Compose with preconfigured cgroup constraints.
 
-When running Pithon alongside critical background services (e.g. OwnTracks, MQTT brokers, databases) on low-resource ARM or x86 VPS instances (like Oracle Cloud 2-core ARM), Pithon can be deployed using Docker with strict cgroup isolation to guarantee zero CPU or RAM starvation for other workloads.
+### 1. Clone the Repository
+```bash
+git clone https://github.com/pranabeshsingh/Khepri.git
+cd Khepri
+```
 
-### 1. Launch with Docker Compose
+### 2. Configure Environment Variables
+```bash
+cp .env.example .env
+nano .env
+```
+Fill in:
+```bash
+TELEGRAM_BOT_TOKEN="your_bot_token_from_botfather"
+TELEGRAM_ADMIN_CHAT_ID="your_numeric_chat_id"
+WEB_ADMIN_PASSWORD="set_a_secure_web_passphrase"
+TIMEZONE="Asia/Kolkata"
+```
+
+### 3. Launch Containers
 ```bash
 docker compose up -d --build
 ```
 
-### 2. Resource Limits & Port Isolation
-* **CPU Limit (`cpus: 1.0`)**: Caps Pithon to at most 1 CPU core, guaranteeing the host and co-located services always have dedicated CPU headroom.
-* **Memory Limit (`mem_limit: 2048m`)**: Strict 2 GB hard limit. Pithon with Qwen2.5-0.5B runs at ~780 MB RSS, leaving massive headroom while protecting the host.
-* **Network Binding (`127.0.0.1:8090:8080`)**: Binds exclusively to host loopback port 8090. Not exposed to the public internet, avoiding port collisions.
+The daemon will automatically download the default Qwen2.5-0.5B model (~350MB) on first start.
 
-### 3. Query the Running Daemon
-Query directly via curl or the helper script:
+* **Daemon OpenAI API:** `http://127.0.0.1:8090/v1/chat/completions`
+* **Management Web Portal:** `http://127.0.0.1:8091`
+
+---
+
+## CLI & Bare-Metal Usage
+
+Khepri can also be installed as a local Python package on Raspberry Pi OS or Linux:
+
 ```bash
-# Direct curl
-curl -s http://127.0.0.1:8090/health
+# Set up virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
 
-# Stream log diagnostics into the daemon
-dmesg | ./scripts/query_daemon.sh "Identify hardware errors"
+# Install llama-cpp-python and Khepri package
+pip install --upgrade pip
+pip install llama-cpp-python
+pip install -e .
+
+# Download model
+./scripts/download_model.sh qwen models
 ```
+
+### 1. Pipe Log Analysis (`khepri pipe`)
+Directly diagnose application crash traces from `stdin`:
+```bash
+journalctl -u nginx -n 50 | khepri pipe "What caused the crash?"
+```
+
+### 2. Interactive Terminal Chat (`khepri chat`)
+Launch a multi-turn terminal REPL over SSH:
+```bash
+khepri chat
+```
+
+### 3. Background Daemon (`khepri serve`)
+Run a standalone loopback server:
+```bash
+khepri serve --port 8080 --model models/qwen2.5-0.5b-instruct-q4_k_m.gguf
+```
+
+---
+
+## Testing & Quality Assurance
+
+```bash
+# Run unit and security test suite (70 tests)
+pytest tests/ -m "not e2e" -v
+
+# Run linting check
+ruff check pithon tests
+```
+
+---
+
+## Documentation & Wiki
+
+Explore the complete documentation in the [Wiki](wiki/Home.md):
+* [Telegram Bot Setup Guide](wiki/Telegram-Bot-Setup.md)
+* [Bot Commands & Tool Calling Reference](wiki/Bot-Commands-and-Tools.md)
+* [Management Portal Guide](wiki/Web-Portal-Guide.md)
+* [Architecture & Edge Deployment](wiki/Architecture-and-Deployment.md)
+
+---
 
 ## License
 
-Apache-2.0
+Licensed under the [Apache License, Version 2.0](LICENSE).
