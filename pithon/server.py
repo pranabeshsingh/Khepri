@@ -6,12 +6,14 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Type
 from pithon.template import format_chat_prompt
 
+ALLOWED_HOSTNAMES = {"127.0.0.1", "localhost", "pithon", "pithon-daemon"}
+
 def is_loopback_authorized(host: str, origin: str, port: int = 8080) -> bool:
     """Verify that the request is strictly loopback and Origin is legitimate."""
-    allowed = {f"127.0.0.1:{port}", f"localhost:{port}"}
+    allowed = {f"127.0.0.1:{port}", f"localhost:{port}", f"pithon:{port}", f"pithon-daemon:{port}"}
     clean_host = host.lower().strip()
     host_name = clean_host.split(":")[0]
-    if host_name not in ("127.0.0.1", "localhost"):
+    if host_name not in ALLOWED_HOSTNAMES:
         return False
 
     clean_origin = origin.lower().strip()

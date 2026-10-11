@@ -661,6 +661,9 @@ def create_web_server(
             except Exception:
                 return {}
 
+        def do_HEAD(self) -> None:
+            self.do_GET()
+
         def do_GET(self) -> None:
             path = urllib.parse.urlparse(self.path).path
 
