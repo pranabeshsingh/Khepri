@@ -213,7 +213,7 @@ khepri serve --port 8080 --model models/qwen2.5-0.5b-instruct-q4_k_m.gguf
 ## Testing & Quality Assurance
 
 ```bash
-# Run unit and security test suite (70 tests)
+# Run unit and security test suite (80+ tests)
 pytest tests/ -m "not e2e" -v
 
 # Run linting check
