@@ -51,3 +51,32 @@ def test_format_reminder_alert():
     assert "⏰ *Reminder Due Now!*" in text
     assert "Weekly server backup" in text
     assert inline_keyboard[0][0]["callback_data"] == "done:15"
+
+def test_timer_intent_and_parsing():
+    # User actual message
+    prompt = "Can you set a timer for 15 mins?"
+    assert is_task_intent(prompt) is True
+    t = parse_task_text(prompt)
+    assert t["is_timer"] is True
+    assert t["seconds"] == 900
+    assert t["title"] == "15-minute timer"
+    assert t["due_at"] is not None
+
+    # Labeled timer
+    t2 = parse_task_text("Set a timer for 5 minutes for boiling eggs")
+    assert t2["is_timer"] is True
+    assert t2["seconds"] == 300
+    assert "boiling eggs" in t2["title"]
+
+    # Short format
+    t3 = parse_task_text("/timer 10m pizza")
+    assert t3["is_timer"] is True
+    assert t3["seconds"] == 600
+    assert "pizza" in t3["title"]
+
+def test_format_timer_alert():
+    task = {"id": 22, "title": "15-minute timer", "due_at": "2026-10-11T16:16:00"}
+    text, inline_keyboard = format_reminder_alert(task)
+    assert "TIMER UP!" in text
+    assert "15-minute timer" in text
+    assert inline_keyboard[0][0]["callback_data"] == "done:22"
