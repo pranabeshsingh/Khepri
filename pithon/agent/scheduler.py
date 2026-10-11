@@ -161,7 +161,7 @@ class Scheduler:
             except Exception as e:
                 logger.error(f"Scheduler tick error: {e}")
 
-            time.sleep(60.0)
+            time.sleep(5.0)
 
     def start(self) -> None:
         """Start scheduler in background thread."""

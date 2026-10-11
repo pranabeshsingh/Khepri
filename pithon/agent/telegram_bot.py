@@ -277,7 +277,7 @@ class TelegramBot:
             self.send_message(chat_id, status_text)
             return
 
-        # 2. Check Natural Language Task Intent
+        # 2. Check Natural Language Task & Timer Intent
         if is_task_intent(text):
             task_info = parse_task_text(text, default_tz=self.tz_name)
             if self.storage:
@@ -287,17 +287,32 @@ class TelegramBot:
                     list_name=task_info["list_name"],
                     due_at=task_info["due_at"]
                 )
-                due_info = f" _(Due: {task_info['due_at'][:16].replace('T', ' ')})_" if task_info["due_at"] else ""
-                reply_markup = {
-                    "inline_keyboard": [
-                        [{"text": f"✅ Done #{tid}", "callback_data": f"done:{tid}"}]
-                    ]
-                }
-                self.send_message(
-                    chat_id,
-                    f"📌 Scheduled task *#{tid}*: {task_info['title']}{due_info}",
-                    reply_markup=reply_markup
-                )
+                if task_info.get("is_timer"):
+                    due_clean = task_info["due_at"][:19].replace("T", " ") if task_info.get("due_at") else ""
+                    reply_markup = {
+                        "inline_keyboard": [
+                            [{"text": "❌ Cancel Timer", "callback_data": f"del:{tid}"}]
+                        ]
+                    }
+                    msg_text = (
+                        f"⏱️ *Timer Started!*\n\n"
+                        f"📌 *Timer:* {task_info['title']}\n"
+                        f"🕒 *Alert at:* `{due_clean} {self.tz_name}`\n\n"
+                        f"_I will alert you as soon as time is up!_"
+                    )
+                    self.send_message(chat_id, msg_text, reply_markup=reply_markup)
+                else:
+                    due_info = f" _(Due: {task_info['due_at'][:16].replace('T', ' ')})_" if task_info["due_at"] else ""
+                    reply_markup = {
+                        "inline_keyboard": [
+                            [{"text": f"✅ Done #{tid}", "callback_data": f"done:{tid}"}]
+                        ]
+                    }
+                    self.send_message(
+                        chat_id,
+                        f"📌 Scheduled task *#{tid}*: {task_info['title']}{due_info}",
+                        reply_markup=reply_markup
+                    )
                 return
 
         # 3. DuckDuckGo Search & LLM Inference Pipeline
