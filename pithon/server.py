@@ -6,18 +6,19 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Type
 from pithon.template import format_chat_prompt
 
-def is_loopback_authorized(host: str, origin: str, port: int) -> bool:
+def is_loopback_authorized(host: str, origin: str, port: int = 8080) -> bool:
     """Verify that the request is strictly loopback and Origin is legitimate."""
     allowed = {f"127.0.0.1:{port}", f"localhost:{port}"}
     clean_host = host.lower().strip()
-    if clean_host not in allowed:
+    host_name = clean_host.split(":")[0]
+    if host_name not in ("127.0.0.1", "localhost"):
         return False
 
     clean_origin = origin.lower().strip()
     if clean_origin:
         if clean_origin.startswith("http://"):
-            origin_host = clean_origin[len("http://"):]
-            if origin_host not in allowed:
+            origin_netloc = clean_origin[len("http://"):].rstrip("/").split("/")[0]
+            if origin_netloc != clean_host and origin_netloc not in allowed:
                 return False
         else:
             return False
@@ -169,7 +170,6 @@ def make_server_handler(engine: Any, port: int) -> Type[BaseHTTPRequestHandler]:
                 self.end_headers()
 
         def log_message(self, format: str, *args: Any) -> None:
-            # Suppress default noisy access logs to stderr
             pass
 
     return PithonHandler

@@ -1,0 +1,27 @@
+services:
+  pithon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pithon:latest
+    container_name: pithon-daemon
+    restart: unless-stopped
+    ports:
+      # Strictly bind to loopback port 8090 to prevent external exposure and avoid port collisions
+      - "127.0.0.1:8090:8080"
+    volumes:
+      - ./models:/app/models
+    environment:
+      - PITHON_MODEL=/app/models/qwen2.5-0.5b-instruct-q4_k_m.gguf
+    # Enforce strict cgroup resource constraints
+    # Cap CPU to 1 core max (out of 2 cores) so OwnTracks & host always have dedicated CPU
+    cpus: 1.0
+    mem_limit: 2048m
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: "2048M"
+        reservations:
+          cpus: "0.2"
+          memory: "512M"
