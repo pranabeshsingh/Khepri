@@ -6,7 +6,7 @@ Khepri includes a dark-mode web management portal designed with frosted glassmor
 
 ## 1. Accessing the Portal
 
-The web portal is hosted by `pithon-agent` and bound internally to `127.0.0.1:8091` (or your reverse-proxied public domain, e.g. `https://pithon.trylocalhost.com` or custom subdomain).
+The web portal is hosted by `pithon-agent` and bound internally to `127.0.0.1:8091` (or your reverse-proxied public domain, e.g. `https://khepri.trylocalhost.com` or custom subdomain).
 
 ### Authentication
 * Enter the passphrase configured in your `.env` under `WEB_ADMIN_PASSWORD` (or `PORTAL_PASSPHRASE`).

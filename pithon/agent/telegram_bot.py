@@ -199,7 +199,7 @@ class TelegramBot:
                         {"text": "🕒 Date & Time", "callback_data": "menu:time"}
                     ],
                     [
-                        {"text": "📊 Open Dashboard", "url": "https://pithon.trylocalhost.com"}
+                        {"text": "📊 Open Dashboard", "url": "https://khepri.trylocalhost.com"}
                     ]
                 ]
             }

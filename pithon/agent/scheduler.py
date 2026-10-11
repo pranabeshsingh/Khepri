@@ -21,7 +21,7 @@ class Scheduler:
         admin_chat_id: str = "",
         report_chat_id: str = "",
         tz_name: str = "Asia/Kolkata",
-        dashboard_url: str = "https://pithon.trylocalhost.com"
+        dashboard_url: str = "https://khepri.trylocalhost.com"
     ):
         self.bot = bot
         self.storage = storage
