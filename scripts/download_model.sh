@@ -1,27 +1,54 @@
 #!/bin/bash
-# Download Qwen2.5-0.5B-Instruct GGUF (Q4_K_M, ~350 MB) for Raspberry Pi 3
+# Download GGUF models for Pithon (Raspberry Pi 3 and CI)
+# Usage: ./scripts/download_model.sh [qwen|smollm|all] [destination_dir]
 set -euo pipefail
 
-DEST_DIR="${1:-models}"
-MODEL_FILE="qwen2.5-0.5b-instruct-q4_k_m.gguf"
-URL="https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+CHOICE="${1:-qwen}"
+DEST_DIR="${2:-models}"
+
+QWEN_URL="https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+QWEN_FILE="qwen2.5-0.5b-instruct-q4_k_m.gguf"
+
+SMOLLM_URL="https://huggingface.co/HuggingFaceTB/SmolLM-135M-Instruct-GGUF/resolve/main/smollm-135m-instruct-q4_k_m.gguf"
+SMOLLM_FILE="smollm-135m-instruct-q4_k_m.gguf"
 
 mkdir -p "$DEST_DIR"
-TARGET="$DEST_DIR/$MODEL_FILE"
 
-if [ -f "$TARGET" ]; then
-    echo "==> Model already exists at: $TARGET"
-    exit 0
-fi
+download_one() {
+    local url="$1"
+    local name="$2"
+    local target="$DEST_DIR/$name"
 
-echo "==> Downloading Qwen2.5-0.5B-Instruct (Q4_K_M ~350 MB)..."
-if command -v curl >/dev/null 2>&1; then
-    curl -L --progress-bar -o "$TARGET" "$URL"
-elif command -v wget >/dev/null 2>&1; then
-    wget -O "$TARGET" "$URL"
-else
-    echo "error: neither curl nor wget found." >&2
-    exit 1
-fi
+    if [ -f "$target" ]; then
+        echo "==> Model already exists: $target"
+        return 0
+    fi
 
-echo "==> Model successfully downloaded to $TARGET"
+    echo "==> Downloading $name..."
+    if command -v curl >/dev/null 2>&1; then
+        curl -L --progress-bar -o "$target" "$url"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -O "$target" "$url"
+    else
+        echo "error: neither curl nor wget found." >&2
+        exit 1
+    fi
+    echo "==> Successfully downloaded $target"
+}
+
+case "$CHOICE" in
+    qwen)
+        download_one "$QWEN_URL" "$QWEN_FILE"
+        ;;
+    smollm)
+        download_one "$SMOLLM_URL" "$SMOLLM_FILE"
+        ;;
+    all)
+        download_one "$SMOLLM_URL" "$SMOLLM_FILE"
+        download_one "$QWEN_URL" "$QWEN_FILE"
+        ;;
+    *)
+        echo "Usage: $0 [qwen|smollm|all] [destination_dir]" >&2
+        exit 1
+        ;;
+esac
