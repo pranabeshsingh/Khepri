@@ -81,8 +81,8 @@ def is_weather_intent(text: str) -> bool:
     clean = text.lower().strip()
     return bool(re.search(r"\b(?:weather|temperature|forecast|temp|rain|raining)\b", clean))
 
-def extract_weather_location(text: str) -> str:
-    """Extract location name from a weather query, defaulting to Kolkata."""
+def extract_weather_location(text: str, default_loc: str = "Kolkata") -> str:
+    """Extract location name from a weather query, defaulting to user's home city or Kolkata."""
     m = re.search(r"\b(?:in|at|for|of)\s+([a-zA-Z\s]+?)(?:\?|$|\.|\btoday\b|\bcurrently\b|\bnow\b)", text, re.IGNORECASE)
     if m:
         loc = m.group(1).strip()
@@ -90,4 +90,4 @@ def extract_weather_location(text: str) -> str:
             return loc
     clean = re.sub(r"\b(how|what|is|the|weather|temperature|forecast|temp|like|today|now|in|at|for|of|please|tell|me|rain|raining)\b", "", text, flags=re.IGNORECASE)
     clean = re.sub(r"[?!.]+", "", clean).strip()
-    return clean if len(clean) > 1 else "Kolkata"
+    return clean if len(clean) > 1 else default_loc

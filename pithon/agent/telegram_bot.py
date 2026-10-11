@@ -18,6 +18,12 @@ from pithon.agent.tasks import (
 from pithon.agent.calc import safe_calculate
 from pithon.agent.weather import get_weather_report, is_weather_intent, extract_weather_location
 from pithon.agent.memory import list_notes, save_note
+from pithon.agent.profile import (
+    start_onboarding,
+    handle_onboarding_step,
+    format_user_profile_prompt_header,
+    get_default_weather_city
+)
 from pithon.agent.tools import (
     format_tools_system_prompt,
     extract_tool_call,
@@ -178,6 +184,22 @@ class TelegramBot:
         self.send_chat_action(chat_id, action="typing")
 
         # 1. Fast-path Explicit Slash Commands
+        # Check /init command
+        if text.startswith("/init"):
+            arg = text[5:].strip()
+            reply = start_onboarding(str(chat_id), self.storage, text=arg, tz_name=self.tz_name)
+            self.send_message(chat_id, reply)
+            return
+
+        # Check active onboarding step
+        if self.storage:
+            prof = self.storage.get_user_profile(str(chat_id))
+            if prof and prof.get("step"):
+                step_reply = handle_onboarding_step(str(chat_id), text, self.storage, tz_name=self.tz_name)
+                if step_reply:
+                    self.send_message(chat_id, step_reply)
+                    return
+
         if text.startswith("/start") or text.startswith("/help"):
             help_text = (
                 "👋 *Welcome to Khepri Assistant!*\n\n"
@@ -361,7 +383,8 @@ class TelegramBot:
 
         # Direct conversational weather intent (e.g. 'how is the weather in kolkata?')
         if is_weather_intent(text):
-            loc = extract_weather_location(text)
+            home_city = get_default_weather_city(self.storage, str(chat_id), fallback="Kolkata")
+            loc = extract_weather_location(text, default_loc=home_city)
             report = get_weather_report(loc)
             ans = report.get("summary", "No weather data.")
             if self.storage:
@@ -393,7 +416,8 @@ class TelegramBot:
         # 2. Conversational Intent via Native Qwen2.5 Tool Calling & Temporal Grounding
         tools_system = format_tools_system_prompt()
         temporal_header = format_temporal_prompt_header(self.tz_name)
-        system_prompt = f"{tools_system}\n\n{temporal_header}"
+        user_profile_header = format_user_profile_prompt_header(self.storage, str(chat_id))
+        system_prompt = f"{tools_system}\n\n{user_profile_header}\n{temporal_header}"
 
         recent_history = self.storage.get_recent_history(limit=3, chat_id=str(chat_id)) if self.storage else []
         start_t = time.time()

@@ -73,6 +73,16 @@ class Storage:
                 chat_id TEXT PRIMARY KEY,
                 cleared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS user_profiles (
+                chat_id TEXT PRIMARY KEY,
+                name TEXT DEFAULT '',
+                city TEXT DEFAULT '',
+                digest_pref TEXT DEFAULT '',
+                focus TEXT DEFAULT '',
+                step TEXT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
             """)
 
     def get_table_names(self) -> List[str]:
@@ -391,3 +401,111 @@ class Storage:
         """Remove a session token (logout)."""
         with self._lock, self._get_connection() as conn:
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+
+    def get_user_profile(self, chat_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve user profile by chat_id (falls back to 'web' if not found)."""
+        with self._lock, self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM user_profiles WHERE chat_id = ? LIMIT 1",
+                (str(chat_id),)
+            ).fetchone()
+            if not row and str(chat_id) != "web":
+                row = conn.execute(
+                    "SELECT * FROM user_profiles WHERE chat_id = 'web' LIMIT 1"
+                ).fetchone()
+            return dict(row) if row else None
+
+    def save_user_profile(
+        self,
+        chat_id: str,
+        name: str = "",
+        city: str = "",
+        digest_pref: str = "",
+        focus: str = "",
+        step: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Save or update user profile fields."""
+        target = str(chat_id)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        with self._lock, self._get_connection() as conn:
+            existing = conn.execute(
+                "SELECT * FROM user_profiles WHERE chat_id = ? LIMIT 1",
+                (target,)
+            ).fetchone()
+
+            if existing:
+                new_name = name if name != "" else existing["name"]
+                new_city = city if city != "" else existing["city"]
+                new_digest = digest_pref if digest_pref != "" else existing["digest_pref"]
+                new_focus = focus if focus != "" else existing["focus"]
+                new_step = step if step is not None else existing["step"]
+
+                conn.execute(
+                    """
+                    UPDATE user_profiles
+                    SET name = ?, city = ?, digest_pref = ?, focus = ?, step = ?, updated_at = ?
+                    WHERE chat_id = ?
+                    """,
+                    (new_name, new_city, new_digest, new_focus, new_step, now_iso, target)
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO user_profiles (chat_id, name, city, digest_pref, focus, step, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (target, name, city, digest_pref, focus, step, now_iso)
+                )
+
+            # Mirror to 'web' for unified admin experience
+            if target != "web":
+                cur_name = name or (existing["name"] if existing else "")
+                cur_city = city or (existing["city"] if existing else "")
+                cur_digest = digest_pref or (existing["digest_pref"] if existing else "")
+                cur_focus = focus or (existing["focus"] if existing else "")
+                conn.execute(
+                    """
+                    INSERT INTO user_profiles (chat_id, name, city, digest_pref, focus, step, updated_at)
+                    VALUES ('web', ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(chat_id) DO UPDATE SET
+                      name = excluded.name,
+                      city = excluded.city,
+                      digest_pref = excluded.digest_pref,
+                      focus = excluded.focus,
+                      step = excluded.step,
+                      updated_at = excluded.updated_at
+                    """,
+                    (cur_name, cur_city, cur_digest, cur_focus, step, now_iso)
+                )
+
+            conn.commit()
+            row = conn.execute(
+                "SELECT * FROM user_profiles WHERE chat_id = ? LIMIT 1",
+                (target,)
+            ).fetchone()
+            return dict(row)
+
+    def set_onboarding_step(self, chat_id: str, step: Optional[str]) -> None:
+        """Set or clear the current active onboarding step for a chat."""
+        target = str(chat_id)
+        with self._lock, self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO user_profiles (chat_id, step) VALUES (?, ?)
+                ON CONFLICT(chat_id) DO UPDATE SET step = excluded.step
+                """,
+                (target, step)
+            )
+            if target != "web":
+                conn.execute(
+                    """
+                    INSERT INTO user_profiles (chat_id, step) VALUES ('web', ?)
+                    ON CONFLICT(chat_id) DO UPDATE SET step = excluded.step
+                    """,
+                    (step,)
+                )
+            conn.commit()
+
+    def clear_onboarding(self, chat_id: str) -> None:
+        """Clear active onboarding step."""
+        self.set_onboarding_step(chat_id, None)

@@ -97,6 +97,8 @@ Copy and send this directly to [@BotFather](https://t.me/BotFather) after typing
 ```text
 start - Open Khepri and view quick menu
 help - Show all commands and features
+init - Setup personal profile and preferences
+clear - Clear conversation context memory
 time - Current date, time, and timezone
 tasks - View active tasks and reminders
 add - Add a new task or scheduled reminder

@@ -18,6 +18,12 @@ from pithon.agent.memory import list_notes, get_note_content, save_note, delete_
 from pithon.agent.calc import safe_calculate
 from pithon.agent.weather import get_weather_report, is_weather_intent, extract_weather_location
 from pithon.agent.tools import extract_tool_call, execute_tool_call
+from pithon.agent.profile import (
+    start_onboarding,
+    handle_onboarding_step,
+    format_user_profile_prompt_header,
+    get_default_weather_city
+)
 
 logger = logging.getLogger("pithon.web")
 
@@ -2042,6 +2048,10 @@ def create_web_server(
                     n["content"] = get_note_content(n["filename"])
                 self._send_json(notes_list)
 
+            elif path == "/api/profile":
+                prof = storage.get_user_profile(str(admin_id or "web")) if storage else {}
+                self._send_json(prof or {})
+
             elif path == "/api/digests":
                 digests = storage.get_digests(limit=24) if storage else []
                 self._send_json(digests)
@@ -2154,9 +2164,20 @@ def create_web_server(
                 reply_text = ""
                 search_q = None
 
+                # 0. Check /init command or active onboarding step
+                if prompt.startswith("/init"):
+                    arg = prompt[5:].strip()
+                    reply_text = start_onboarding(str(admin_id or "web"), storage, text=arg, tz_name=tz_name)
+
+                elif not reply_text and storage:
+                    prof = storage.get_user_profile(str(admin_id or "web"))
+                    if prof and prof.get("step"):
+                        reply_text = handle_onboarding_step(str(admin_id or "web"), prompt, storage, tz_name=tz_name)
+
                 # 1. Check direct weather intent
-                if is_weather_intent(prompt):
-                    loc = extract_weather_location(prompt)
+                if not reply_text and is_weather_intent(prompt):
+                    home_city = get_default_weather_city(storage, str(admin_id or "web"), fallback="Kolkata")
+                    loc = extract_weather_location(prompt, default_loc=home_city)
                     report = get_weather_report(loc)
                     reply_text = report.get("summary", "No weather data.")
 
@@ -2227,11 +2248,12 @@ def create_web_server(
                 if not reply_text:
                     temporal_header = format_temporal_prompt_header(tz_name)
                     base_prompt = get_preset_system_prompt(preset)
+                    user_profile_header = format_user_profile_prompt_header(storage, str(admin_id or "web"))
                     if preset in ("default", "general"):
                         from pithon.agent.tools import format_tools_system_prompt
-                        sys_prompt = f"{format_tools_system_prompt()}\n\n{temporal_header}\n{base_prompt}"
+                        sys_prompt = f"{format_tools_system_prompt()}\n\n{user_profile_header}\n{temporal_header}\n{base_prompt}"
                     else:
-                        sys_prompt = temporal_header + "\n" + base_prompt
+                        sys_prompt = f"{user_profile_header}\n{temporal_header}\n{base_prompt}"
 
                     # Pull recent multi-turn history from SQLite
                     recent_history = storage.get_recent_history(limit=3, chat_id=admin_id) if storage else []
