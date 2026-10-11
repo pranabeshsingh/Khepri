@@ -33,8 +33,8 @@ class TelegramBot:
     def __init__(
         self,
         token: str,
-        admin_chat_id: str = "357035668",
-        report_chat_id: str = "-1001169201210",
+        admin_chat_id: str = "",
+        report_chat_id: str = "",
         storage: Any = None,
         daemon_url: str = "http://127.0.0.1:8090",
         tz_name: str = "Asia/Kolkata"

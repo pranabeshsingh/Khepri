@@ -13,7 +13,7 @@
 - Zero CPU/RAM starvation for OwnTracks: `pithon-agent` capped at 0.5 CPU and 512 MB RAM.
 - Zero secrets committed to git: all credentials, tokens, passwords, and chat IDs loaded via uncommitted `.env`.
 - Loopback isolation: Web UI binds internally and maps to `127.0.0.1:8091`.
-- Telegram chat whitelist: only chat ID `357035668` allowed for interactive chat; group `-1001169201210` receives silent hourly digests only. All other chats dropped.
+- Telegram chat whitelist: only chat ID `<YOUR_ADMIN_CHAT_ID>` allowed for interactive chat; group `<YOUR_REPORT_CHAT_ID>` receives silent hourly digests only. All other chats dropped.
 - Hourly digest must use `disable_notification=True`.
 
 ---
@@ -189,8 +189,8 @@ git commit -m "feat(agent): add natural language task parser and inline button f
 
 - [x] **Step 1: Write the failing test**
 Create `tests/test_agent_telegram.py` with mock Telegram API responses testing:
-  - Acceptance of admin chat `357035668`.
-  - Inbound discard of report chat `-1001169201210`.
+  - Acceptance of admin chat `<YOUR_ADMIN_CHAT_ID>`.
+  - Inbound discard of report chat `<YOUR_REPORT_CHAT_ID>`.
   - Discard of unknown chat IDs.
   - Callback queries: `done:<id>`, `snooze:<id>`.
   - Slash commands: `/time`, `/todo`, `/search`, `/poll`, `/status`.
@@ -380,8 +380,8 @@ ssh ubuntu@pithon.trylocalhost.com "docker ps && docker stats --no-stream"
 Confirm OwnTracks containers are 100% untouched and healthy, and `pithon-agent` is using < 50 MB RAM.
 
 - [x] **Step 6: Live Telegram & Web UI Verification**
-- Send a test message and `/time` in Telegram chat `357035668`.
+- Send a test message and `/time` in Telegram chat `<YOUR_ADMIN_CHAT_ID>`.
 - Test `/search` with inline URL source buttons.
 - Create a task and test the `[ ✅ Done ]` inline button.
-- Trigger on-demand `/digest` and verify silent dispatch to group `-1001169201210`.
+- Trigger on-demand `/digest` and verify silent dispatch to group `<YOUR_REPORT_CHAT_ID>`.
 - Visit `https://pithon.trylocalhost.com`, log in with passphrase, and verify dashboard metrics and interaction log.

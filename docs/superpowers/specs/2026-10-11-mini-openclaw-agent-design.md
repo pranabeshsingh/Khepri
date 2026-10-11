@@ -5,12 +5,12 @@ Transform Pithon into a lightweight, always-on personal AI assistant ("Mini-Open
 1. **Dynamic Temporal Awareness**: Accurate date, time, weekday, and timezone (`Asia/Kolkata`) injected into every prompt.
 2. **DuckDuckGo Web Search**: Hybrid retrieval (natural language heuristic + explicit `/search` command) augmenting the 0.5B model with live external facts.
 3. **Telegram Bot Interface**:
-   - Private interactive chat restricted strictly to chat ID `357035668`.
-   - Hourly analytical digest dispatched with silent notifications (`disable_notification=True`) to group ID `-1001169201210`.
+   - Private interactive chat restricted strictly to chat ID `<YOUR_ADMIN_CHAT_ID>`.
+   - Hourly analytical digest dispatched with silent notifications (`disable_notification=True`) to group ID `<YOUR_REPORT_CHAT_ID>`.
    - All other chat IDs strictly and silently discarded.
 4. **Tasks, Reminders & Lists Engine**:
    - Natural language task/reminder parsing using Pithon's `reminder` preset + fast slash commands (`/todo`, `/add`, `/done`, `/list`).
-   - Minute-precision background scheduler delivering timely reminder alerts to chat ID `357035668`.
+   - Minute-precision background scheduler delivering timely reminder alerts to chat ID `<YOUR_ADMIN_CHAT_ID>`.
    - Hourly digest includes tasks completed and upcoming tasks due within 3 hours.
 5. **Modern Web UI**:
    - Hosted at `127.0.0.1:8091` and exposed via Host Nginx at `https://pithon.trylocalhost.com`.
@@ -119,7 +119,7 @@ Transform Pithon into a lightweight, always-on personal AI assistant ("Mini-Open
 - **Background Dispatcher (`pithon/agent/scheduler.py`)**:
   - Ticks every 60 seconds.
   - Finds tasks where `is_completed = 0`, `reminded = 0`, and `due_at <= current_time`.
-  - Dispatches direct notification to chat ID `357035668`:
+  - Dispatches direct notification to chat ID `<YOUR_ADMIN_CHAT_ID>`:
     ```markdown
     ⏰ *Reminder Due Now!*
     📌 *Task:* Renew domain
@@ -131,9 +131,9 @@ Transform Pithon into a lightweight, always-on personal AI assistant ("Mini-Open
 ### 3.4. Telegram Bot Router (`pithon/agent/telegram_bot.py`)
 - **Long-Polling**: Uses Telegram Bot API `getUpdates` with `timeout=30` handling both `message` and `callback_query` updates.
 - **Chat Whitelist**:
-  - `chat_id == 357035668`:
+  - `chat_id == <YOUR_ADMIN_CHAT_ID>`:
     - Process message, trigger `sendChatAction(action="typing")`, execute search/SLM pipeline, record interaction in SQLite, respond via `sendMessage` (chunked at 4000 characters).
-  - `chat_id == -1001169201210`:
+  - `chat_id == <YOUR_REPORT_CHAT_ID>`:
     - Inbound messages silently ignored.
     - Destination for hourly digests only.
   - Any other `chat_id`:
@@ -163,7 +163,7 @@ Transform Pithon into a lightweight, always-on personal AI assistant ("Mini-Open
     - Interaction count, searches executed, average latency.
     - Completed tasks & tasks due in next 3 hours.
     - System health snapshot (uptime, daemon RSS, CPU load).
-  - Sends to `-1001169201210` with `disable_notification=True`.
+  - Sends to `<YOUR_REPORT_CHAT_ID>` with `disable_notification=True`.
 
 ### 3.5. SQLite Storage (`pithon/agent/storage.py`)
 - Path: `/app/data/pithon.db` (mounted to `./data` on host).
@@ -195,9 +195,9 @@ Transform Pithon into a lightweight, always-on personal AI assistant ("Mini-Open
 ### 4.1. Secrets Management
 - All credentials stored in `/home/ubuntu/Pithon/.env` (mode `0600`):
   ```bash
-  TELEGRAM_BOT_TOKEN="8737152158:AAHc4H3KgnBPHE9q30pLy1e4Urlc_sHedyQ"
-  TELEGRAM_ADMIN_CHAT_ID="357035668"
-  TELEGRAM_REPORT_CHAT_ID="-1001169201210"
+  TELEGRAM_BOT_TOKEN="<YOUR_TELEGRAM_BOT_TOKEN>"
+  TELEGRAM_ADMIN_CHAT_ID="<YOUR_ADMIN_CHAT_ID>"
+  TELEGRAM_REPORT_CHAT_ID="<YOUR_REPORT_CHAT_ID>"
   WEB_ADMIN_PASSWORD="<generated-secure-passphrase>"
   TIMEZONE="Asia/Kolkata"
   PITHON_DAEMON_URL="http://pithon-daemon:8080"
@@ -257,10 +257,10 @@ server {
    - `test_time_context.py`: Verify timezone calculations, format strings, and weekday logic.
    - `test_search.py`: Mocked DuckDuckGo queries verifying snippet parsing, timeouts, and prompt injection formatting.
    - `test_tasks.py`: Verify task creation, listing, completion toggles, and minute scheduler queries.
-   - `test_telegram_whitelist.py`: Verify message acceptance from `357035668`, rejection from `-1001169201210`, and drop of untrusted IDs.
+   - `test_telegram_whitelist.py`: Verify message acceptance from `<YOUR_ADMIN_CHAT_ID>`, rejection from `<YOUR_REPORT_CHAT_ID>`, and drop of untrusted IDs.
    - `test_web_auth.py`: Verify rate limiting, password validation, session token lifecycle, and unauthorized redirects.
 2. **End-to-End Live Validation on VM**:
-   - Test DuckDuckGo query via Telegram bot in chat `357035668`.
-   - Test silent hourly digest generation dispatched to group `-1001169201210`.
+   - Test DuckDuckGo query via Telegram bot in chat `<YOUR_ADMIN_CHAT_ID>`.
+   - Test silent hourly digest generation dispatched to group `<YOUR_REPORT_CHAT_ID>`.
    - Test Web UI login and dashboard rendering at `https://pithon.trylocalhost.com`.
    - Run `docker stats` to verify total memory overhead remains under 50 MB for the agent and OwnTracks continues unaffected.

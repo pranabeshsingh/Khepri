@@ -12,8 +12,8 @@ def mock_storage(tmp_path):
 def bot(mock_storage):
     return TelegramBot(
         token="test-token",
-        admin_chat_id="357035668",
-        report_chat_id="-1001169201210",
+        admin_chat_id="123456789",
+        report_chat_id="-1001234567890",
         storage=mock_storage,
         daemon_url="http://127.0.0.1:8090",
         tz_name="Asia/Kolkata"
@@ -34,7 +34,7 @@ def test_whitelist_rejection(bot):
     # Report group inbound message should also be silently ignored
     msg_report_group = {
         "message_id": 2,
-        "chat": {"id": -1001169201210},
+        "chat": {"id": -1001234567890},
         "from": {"id": 12345},
         "text": "Hello group"
     }
@@ -45,23 +45,23 @@ def test_whitelist_rejection(bot):
 def test_command_time(bot):
     msg = {
         "message_id": 10,
-        "chat": {"id": 357035668},
-        "from": {"id": 357035668},
+        "chat": {"id": 123456789},
+        "from": {"id": 123456789},
         "text": "/time"
     }
     with patch.object(bot, "send_message") as mock_send:
         bot.handle_message(msg)
         mock_send.assert_called_once()
         args, kwargs = mock_send.call_args
-        assert args[0] == 357035668
+        assert args[0] == 123456789
         assert "Asia/Kolkata" in args[1]
 
 def test_command_tasks(bot, mock_storage):
-    mock_storage.create_task("357035668", "Test item 1")
+    mock_storage.create_task("123456789", "Test item 1")
     msg = {
         "message_id": 11,
-        "chat": {"id": 357035668},
-        "from": {"id": 357035668},
+        "chat": {"id": 123456789},
+        "from": {"id": 123456789},
         "text": "/todo"
     }
     with patch.object(bot, "send_message") as mock_send:
@@ -73,13 +73,13 @@ def test_command_tasks(bot, mock_storage):
         assert "inline_keyboard" in kwargs["reply_markup"]
 
 def test_callback_query_done(bot, mock_storage):
-    tid = mock_storage.create_task("357035668", "Task to complete")
+    tid = mock_storage.create_task("123456789", "Task to complete")
     cb = {
         "id": "cb123",
-        "from": {"id": 357035668},
+        "from": {"id": 123456789},
         "message": {
             "message_id": 20,
-            "chat": {"id": 357035668},
+            "chat": {"id": 123456789},
             "text": "Task to complete"
         },
         "data": f"done:{tid}"
@@ -97,8 +97,8 @@ def test_tool_call_timer(bot, mock_storage):
 </tool_call>"""
     msg = {
         "message_id": 30,
-        "chat": {"id": 357035668},
-        "from": {"id": 357035668},
+        "chat": {"id": 123456789},
+        "from": {"id": 123456789},
         "text": "Can you set a timer for 15 mins to boil eggs?"
     }
     with patch.object(bot, "_query_daemon", return_value=tool_xml), \
@@ -112,7 +112,7 @@ def test_tool_call_timer(bot, mock_storage):
         assert "inline_keyboard" in kwargs["reply_markup"]
 
         # Verify task created in database
-        tasks = mock_storage.get_tasks("357035668")
+        tasks = mock_storage.get_tasks("123456789")
         assert len(tasks) == 1
         assert tasks[0]["title"] == "Boil Eggs"
         assert tasks[0]["list_name"] == "timer"
@@ -123,8 +123,8 @@ def test_tool_call_task(bot, mock_storage):
 </tool_call>"""
     msg = {
         "message_id": 31,
-        "chat": {"id": 357035668},
-        "from": {"id": 357035668},
+        "chat": {"id": 123456789},
+        "from": {"id": 123456789},
         "text": "Add buy oat milk to my groceries list"
     }
     with patch.object(bot, "_query_daemon", return_value=tool_xml), \
@@ -134,7 +134,7 @@ def test_tool_call_task(bot, mock_storage):
         args, kwargs = mock_send.call_args
         assert "Buy oat milk" in args[1]
         assert "[groceries]" in args[1]
-        tasks = mock_storage.get_tasks("357035668")
+        tasks = mock_storage.get_tasks("123456789")
         assert len(tasks) == 1
         assert tasks[0]["title"] == "Buy oat milk"
         assert tasks[0]["list_name"] == "groceries"
@@ -145,8 +145,8 @@ def test_tool_call_web_search(bot):
 </tool_call>"""
     msg = {
         "message_id": 32,
-        "chat": {"id": 357035668},
-        "from": {"id": 357035668},
+        "chat": {"id": 123456789},
+        "from": {"id": 123456789},
         "text": "What is the latest status of Mars rover?"
     }
     with patch.object(bot, "_query_daemon", side_effect=[tool_xml, "Perseverance is currently exploring Jezero Crater."]), \
