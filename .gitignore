@@ -6,3 +6,15 @@ __pycache__/
 models/
 build/
 dist/
+
+# Environment variables & secrets
+.env
+.env.*
+*.env
+
+# SQLite Databases & runtime storage
+data/
+*.db
+*.sqlite
+*.sqlite3
+!.env.example

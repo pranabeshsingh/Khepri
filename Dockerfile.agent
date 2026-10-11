@@ -1,0 +1,18 @@
+FROM python:3.12-slim-bookworm
+
+WORKDIR /app
+
+# Copy project specification
+COPY pyproject.toml requirements.txt README.md ./
+COPY pithon/ ./pithon/
+
+# Install pithon without heavy C++ dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --no-deps .
+
+# Create data volume directory
+RUN mkdir -p /app/data
+
+EXPOSE 8080
+
+CMD ["python3", "-m", "pithon.agent.main"]

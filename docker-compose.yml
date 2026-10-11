@@ -25,3 +25,30 @@ services:
         reservations:
           cpus: "0.2"
           memory: "512M"
+
+  pithon-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    image: pithon-agent:latest
+    container_name: pithon-agent
+    restart: unless-stopped
+    ports:
+      # Binds internally to loopback port 8091 for Host Nginx reverse proxy
+      - "127.0.0.1:8091:8080"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      - PITHON_DAEMON_URL=http://pithon:8080
+      - DB_PATH=/app/data/pithon.db
+    cpus: 0.5
+    mem_limit: 512m
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: "512M"
+    depends_on:
+      - pithon
