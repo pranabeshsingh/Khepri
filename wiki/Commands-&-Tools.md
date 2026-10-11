@@ -1,26 +1,54 @@
 # Telegram Commands & Native Tool Calling
 
-Khepri features a hybrid interaction layer: you can either execute deterministic slash commands or chat naturally while the 0.5B model routes function calls behind the scenes.
+Khepri features a hybrid interaction layer: deterministic slash commands, quick BotFather action registration, and natural conversational routing with native tool calling powered by Qwen2.5-0.5B.
 
 ---
 
-## 1. Slash Commands Reference
+## 1. Quick BotFather Command Setup
+
+When configuring your bot in Telegram, open **[@BotFather](https://t.me/BotFather)**, send `/setcommands`, select your bot, and send this exact block:
+
+```text
+start - Open Khepri and view quick menu
+help - Show all commands and features
+time - Current date, time, and timezone
+tasks - View active tasks and reminders
+add - Add a new task or scheduled reminder
+timer - Start a countdown timer
+weather - Live weather forecast for a city
+calc - Evaluate mathematical expression
+notes - Browse saved markdown notes
+note - Save a new note into memory
+search - Search web results via DuckDuckGo
+status - View system and inference health
+poll - Create an interactive group poll
+chat - Query local 0.5B AI model
+```
+
+---
+
+## 2. Slash Commands Reference
 
 | Command | Syntax Example | Description | Execution Path |
 | :--- | :--- | :--- | :--- |
-| `/chat` | `/chat Explain TCP 3-way handshake in 3 bullet points` | Direct prompt to local 0.5B SLM | `pithon-daemon` inference |
-| `/task` | `/task Deploy Khepri v0.2 in 45m` | Add scheduled task or reminder | SQLite task store + cron |
-| `/tasks` | `/tasks` | List pending tasks and reminders | SQLite queries |
-| `/weather` | `/weather Kolkata` | Live temperature, humidity, wind & forecast | Instant `wttr.in` API (0 API keys) |
+| `/start` | `/start` | Open welcome greeting & quick interactive menu | Telegram API inline keyboard |
+| `/help` | `/help` | Display interactive cheat sheet & commands | In-memory reference card |
+| `/time` | `/time` | Current date, time, weekday, and configured timezone | Python `zoneinfo` temporal grounder |
+| `/tasks` | `/tasks` (or `/todo`) | List pending tasks and reminders with completion toggles | SQLite task store (`/app/data/pithon.db`) |
+| `/add` | `/add Deploy v0.2 tomorrow at 5pm` | Create a new task or schedule a reminder (or `/task`) | SQLite task store + natural parser |
+| `/timer` | `/timer 15m Pasta` | Start a countdown alert timer | Background cron scheduler |
+| `/weather` | `/weather Tokyo` | Live temperature, humidity, wind & forecast | Instant `wttr.in` API (0 API keys) |
 | `/calc` | `/calc (1024 * 16) / 2` | Safe arithmetic evaluation | Python AST parser (Zero hallucinations) |
-| `/note` | `/note Pi Config: Host IP 192.168.1.50` | Store note in markdown memory | `data/notes/*.md` filesystem |
-| `/search` | `/search Docker cgroup memory limit` | Search local notes + DuckDuckGo web | Hybrid note + DuckDuckGo engine |
+| `/notes` | `/notes` | Browse saved markdown knowledge notes | `data/notes/*.md` filesystem |
+| `/note` | `/note server-ip 192.168.1.50` | Store a key/value or note into markdown memory | `data/notes/*.md` filesystem |
+| `/search` | `/search Docker cgroup memory limit` | Search DuckDuckGo web results | Instant DuckDuckGo search engine |
 | `/status` | `/status` | System health, RAM RSS, active tasks, uptime | Linux OS `/proc/meminfo` & Docker |
-| `/help` | `/help` | Display interactive cheat sheet | In-memory reference card |
+| `/poll` | `/poll "Meeting Time?" "10 AM" "2 PM"` | Launch native Telegram interactive poll | Native Telegram Poll API |
+| `/chat` | `/chat Explain TCP handshake in 3 bullets` | Direct query to local 0.5B SLM | `pithon-daemon` llama.cpp engine |
 
 ---
 
-## 2. Natural Language Tool Calling
+## 3. Natural Language Tool Calling
 
 You do not need to memorize slash commands. The Khepri conversational router intercepts and fulfills queries automatically:
 
@@ -44,9 +72,8 @@ You do not need to memorize slash commands. The Khepri conversational router int
 
 ---
 
-## 3. Whitelist Security & Noise Filtration
+## 4. Whitelist Security & Noise Filtration
 
 * **Private Admin Whitelist:** Only the user matching `TELEGRAM_ADMIN_CHAT_ID` can trigger inference or view data.
-* **Unauthorized Access:** Any incoming message from unknown user IDs receives:
-  `⛔ Access Denied. Your chat ID is not authorized.`
+* **Unauthorized Access:** Any incoming message from unknown user IDs is silently rejected or receives an access denied notice.
 * **Silent Digest Channel (`TELEGRAM_REPORT_CHAT_ID`):** Periodic analytical summaries are pushed here. Inbound messages from channels are discarded without CPU overhead.

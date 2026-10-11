@@ -17,7 +17,7 @@ from pithon.agent.tasks import (
 )
 from pithon.agent.calc import safe_calculate
 from pithon.agent.weather import get_weather_report, is_weather_intent, extract_weather_location
-from pithon.agent.memory import list_notes
+from pithon.agent.memory import list_notes, save_note
 from pithon.agent.tools import (
     format_tools_system_prompt,
     extract_tool_call,
@@ -227,7 +227,7 @@ class TelegramBot:
                 self.send_message(chat_id, "No storage configured.")
             return
 
-        if text.startswith("/add "):
+        if text.startswith("/add ") or text.startswith("/task "):
             task_info = parse_task_text(text, default_tz=self.tz_name)
             if self.storage:
                 tid = self.storage.create_task(
@@ -319,6 +319,36 @@ class TelegramBot:
                     lines.append(f"• *{n['title']}* (`{n['filename']}`)")
                 self.send_message(chat_id, "\n".join(lines))
             return
+
+        if text.startswith("/note "):
+            body = text[6:].strip()
+            parts = body.split(" ", 1)
+            title = parts[0]
+            content = parts[1] if len(parts) > 1 else ""
+            if title and content:
+                res = save_note(title, content, tz_name=self.tz_name)
+                self.send_message(chat_id, f"📝 Saved note *{title}* (`{res.get('filename')}`)")
+            else:
+                self.send_message(chat_id, "Usage: `/note <title> <content>`")
+            return
+
+        if text.startswith("/search "):
+            query = text[8:].strip()
+            if query:
+                results = search_duckduckgo(query, max_results=3)
+                if results:
+                    lines = [f"🔍 *Search results for:* `{query}`\n"]
+                    for r in results:
+                        lines.append(f"• [{r.get('title')}]({r.get('href')})\n  _{r.get('body')[:150]}_")
+                    self.send_message(chat_id, "\n\n".join(lines))
+                else:
+                    self.send_message(chat_id, f"🔍 No web results found for `{query}`.")
+            else:
+                self.send_message(chat_id, "Usage: `/search <query>`")
+            return
+
+        if text.startswith("/chat "):
+            text = text[6:].strip()
 
         # Direct conversational weather intent (e.g. 'how is the weather in kolkata?')
         if is_weather_intent(text):

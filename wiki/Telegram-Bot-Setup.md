@@ -53,15 +53,20 @@ Registering slash commands makes them appear in the native Telegram popup menu w
 4. Copy and paste the following block in a single message:
 
 ```text
-chat - Chat with Khepri 0.5B SLM
-task - Add or schedule a new task
-tasks - List all pending tasks
-weather - Live temperature & weather
-calc - Calculate math expression
-note - Save note to markdown memory
-search - Search notes & DuckDuckGo
-status - Check system health & RAM
-help - View all commands & capabilities
+start - Open Khepri and view quick menu
+help - Show all commands and features
+time - Current date, time, and timezone
+tasks - View active tasks and reminders
+add - Add a new task or scheduled reminder
+timer - Start a countdown timer
+weather - Live weather forecast for a city
+calc - Evaluate mathematical expression
+notes - Browse saved markdown notes
+note - Save a new note into memory
+search - Search web results via DuckDuckGo
+status - View system and inference health
+poll - Create an interactive group poll
+chat - Query local 0.5B AI model
 ```
 
 5. BotFather will confirm: `Success! commands list updated.`

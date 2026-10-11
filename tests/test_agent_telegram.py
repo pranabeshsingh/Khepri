@@ -186,3 +186,42 @@ def test_conversational_calculate(bot):
         mock_send.assert_called_once()
         args, _ = mock_send.call_args
         assert "100" in args[1]
+
+def test_command_task_and_note_and_search(bot, mock_storage, tmp_path):
+    # Test /task
+    msg_task = {
+        "message_id": 50,
+        "chat": {"id": 123456789},
+        "from": {"id": 123456789},
+        "text": "/task Buy vegetables tomorrow"
+    }
+    with patch.object(bot, "send_message") as mock_send:
+        bot.handle_message(msg_task)
+        mock_send.assert_called_once()
+        assert "Buy vegetables" in mock_send.call_args[0][1]
+
+    # Test /note
+    msg_note = {
+        "message_id": 51,
+        "chat": {"id": 123456789},
+        "from": {"id": 123456789},
+        "text": "/note server-ip 192.168.1.100"
+    }
+    with patch("pithon.agent.telegram_bot.save_note", return_value={"filename": "server-ip.md"}) as mock_save,          patch.object(bot, "send_message") as mock_send:
+        bot.handle_message(msg_note)
+        mock_save.assert_called_once_with("server-ip", "192.168.1.100", tz_name="Asia/Kolkata")
+        mock_send.assert_called_once()
+        assert "Saved note" in mock_send.call_args[0][1]
+
+    # Test /search
+    msg_search = {
+        "message_id": 52,
+        "chat": {"id": 123456789},
+        "from": {"id": 123456789},
+        "text": "/search python async"
+    }
+    with patch("pithon.agent.telegram_bot.search_duckduckgo", return_value=[{"title": "Python Async", "href": "https://python.org", "body": "Async docs"}]) as mock_ddg,          patch.object(bot, "send_message") as mock_send:
+        bot.handle_message(msg_search)
+        mock_ddg.assert_called_once_with("python async", max_results=3)
+        mock_send.assert_called_once()
+        assert "Python Async" in mock_send.call_args[0][1]

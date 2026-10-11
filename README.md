@@ -74,15 +74,44 @@ Khepri acts as an always-on personal companion through Telegram. You can execute
 
 | Command | Syntax | Description |
 | :--- | :--- | :--- |
-| `/chat` | `/chat Explain Raft consensus in 3 sentences` | Prompt local 0.5B SLM |
-| `/task` | `/task Renew SSL certificate in 30m` | Schedule reminder/timer |
-| `/tasks` | `/tasks` | Interactive task list & status |
+| `/start` | `/start` | Open welcome greeting & quick interactive menu |
+| `/help` | `/help` | Display interactive cheat sheet |
+| `/time` | `/time` | Current date, time, weekday, and configured timezone |
+| `/tasks` | `/tasks` (or `/todo`) | List pending tasks and reminders with completion toggles |
+| `/add` | `/add Deploy v0.2 tomorrow at 5pm` | Create a new task or scheduled reminder (or `/task`) |
+| `/timer` | `/timer 15m Pasta` | Start countdown timer alert |
 | `/weather` | `/weather Kolkata` | Live temperature, humidity & wind (`wttr.in`) |
-| `/calc` | `/calc (450 * 1.18) + 32` | Safe arithmetic evaluation |
-| `/note` | `/note Server: Oracle ARM 24GB` | Save persistent markdown note |
-| `/search` | `/search Docker cgroup memory limit` | Search local notes + DuckDuckGo web |
+| `/calc` | `/calc (450 * 1.18) + 32` | Safe deterministic arithmetic evaluation |
+| `/notes` | `/notes` | Browse saved markdown knowledge notes |
+| `/note` | `/note Server: Oracle ARM 24GB` | Save key/value note into markdown memory |
+| `/search` | `/search Docker cgroup memory limit` | Search web results via DuckDuckGo |
 | `/status` | `/status` | System health, RAM RSS, active tasks, uptime |
-| `/help` | `/help` | Interactive cheat sheet |
+| `/poll` | `/poll "Meeting Time?" "10 AM" "2 PM"` | Native Telegram interactive poll |
+| `/chat` | `/chat Explain Raft consensus in 3 sentences` | Direct query to local 0.5B SLM |
+
+<details>
+<summary>📋 <strong>BotFather Command Setup Block (Click to Expand)</strong></summary>
+
+Copy and send this directly to [@BotFather](https://t.me/BotFather) after typing `/setcommands`:
+
+```text
+start - Open Khepri and view quick menu
+help - Show all commands and features
+time - Current date, time, and timezone
+tasks - View active tasks and reminders
+add - Add a new task or scheduled reminder
+timer - Start a countdown timer
+weather - Live weather forecast for a city
+calc - Evaluate mathematical expression
+notes - Browse saved markdown notes
+note - Save a new note into memory
+search - Search web results via DuckDuckGo
+status - View system and inference health
+poll - Create an interactive group poll
+chat - Query local 0.5B AI model
+```
+
+</details>
 
 ### Natural Language Interceptors
 * **Weather:** *"How's the weather in Tokyo?"* ➔ Queries `wttr.in/Tokyo` directly, returning structured live metrics without web search hallucinations.
