@@ -281,7 +281,8 @@ LOGIN_HTML = """<!DOCTYPE html>
         <div class="logo-badge">π</div>
         <div>
           <h1>Pithon Agent</h1>
-          <div class="status-pill">
+          <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 0.2rem; font-weight: 500;">Management Portal</div>
+          <div class="status-pill" style="margin-top: 0.45rem;">
             <span class="status-dot"></span>
             <span>Qwen2.5-0.5B • Online</span>
           </div>
