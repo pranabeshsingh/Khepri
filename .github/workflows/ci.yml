@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  unit-tests:
+    name: Unit & Security Tests (${{ matrix.os }} - Py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip install -e .
+
+      - name: Run unit and security tests
+        run: |
+          pytest tests/ -m "not e2e" -v
+
+  arm64-e2e-inference:
+    name: Live ARM64 Model Inference (ubuntu-24.04-arm)
+    runs-on: ubuntu-24.04-arm
+    needs: unit-tests
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install system build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
+
+      - name: Cache model weights
+        id: cache-models
+        uses: actions/cache@v4
+        with:
+          path: models
+          key: pithon-models-${{ hashFiles('scripts/download_model.sh') }}-v1
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install llama-cpp-python
+          pip install -r requirements-dev.txt
+          pip install -e .
+
+      - name: Download test models (SmolLM-135M & Qwen2.5-0.5B)
+        if: steps.cache-models.outputs.cache-hit != 'true'
+        run: |
+          ./scripts/download_model.sh all models
+
+      - name: Run E2E Pytest Suite (Live Inference)
+        run: |
+          pytest tests/test_e2e_real_model.py -v -s
+
+      - name: CLI Sanity Check - Piped Stdin (SmolLM-135M)
+        run: |
+          echo "Oct 11 14:00:00 rpi kernel: [123.45] BUG: unable to handle page fault for address 00000000" | \
+            pithon pipe "What caused the crash?" --model models/smollm-135m-instruct-q4_k_m.gguf
+
+      - name: CLI Sanity Check - Daemon & Curl Test (Qwen2.5-0.5B)
+        run: |
+          pithon serve --port 8080 --model models/qwen2.5-0.5b-instruct-q4_k_m.gguf &
+          SERVER_PID=$!
+          sleep 4
+          curl -s http://127.0.0.1:8080/health | grep '"status": "ok"'
+          curl -s http://127.0.0.1:8080/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{"messages": [{"role": "user", "content": "Say hello in one word"}], "max_tokens": 5}' | grep "choices"
+          kill $SERVER_PID
