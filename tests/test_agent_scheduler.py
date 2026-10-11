@@ -15,8 +15,8 @@ def mock_bot():
     return bot
 
 def test_check_reminders_tick(temp_storage, mock_bot):
-    admin_id = "357035668"
-    report_id = "-1001169201210"
+    admin_id = "123456789"
+    report_id = "-1001234567890"
     scheduler = Scheduler(
         bot=mock_bot,
         storage=temp_storage,
@@ -44,8 +44,8 @@ def test_check_reminders_tick(temp_storage, mock_bot):
     mock_bot.send_message.assert_not_called()
 
 def test_hourly_digest_tick(temp_storage, mock_bot):
-    admin_id = "357035668"
-    report_id = "-1001169201210"
+    admin_id = "123456789"
+    report_id = "-1001234567890"
     scheduler = Scheduler(
         bot=mock_bot,
         storage=temp_storage,

@@ -41,8 +41,8 @@ def main() -> None:
     load_env_file()
 
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
-    admin_chat_id = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "357035668").strip()
-    report_chat_id = os.environ.get("TELEGRAM_REPORT_CHAT_ID", "-1001169201210").strip()
+    admin_chat_id = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "").strip()
+    report_chat_id = os.environ.get("TELEGRAM_REPORT_CHAT_ID", "").strip()
     admin_password = os.environ.get("WEB_ADMIN_PASSWORD", "pithon-secure-pass").strip()
     daemon_url = os.environ.get("PITHON_DAEMON_URL", "http://pithon:8080").strip()
     tz_name = os.environ.get("TIMEZONE", "Asia/Kolkata").strip()

@@ -21,7 +21,7 @@ def test_storage_init(temp_storage):
 
 def test_interaction_lifecycle(temp_storage):
     idx = temp_storage.log_interaction(
-        chat_id="357035668",
+        chat_id="123456789",
         user_id="user1",
         prompt="What is the weather?",
         search_query="weather kolkata",
@@ -44,7 +44,7 @@ def test_interaction_lifecycle(temp_storage):
     assert len(not_found) == 0
 
 def test_task_lifecycle(temp_storage):
-    chat_id = "357035668"
+    chat_id = "123456789"
     task_id = temp_storage.create_task(
         chat_id=chat_id,
         title="Renew domain name",
@@ -73,7 +73,7 @@ def test_task_lifecycle(temp_storage):
     assert len(temp_storage.get_tasks(chat_id=chat_id, include_completed=True)) == 0
 
 def test_pending_reminders(temp_storage):
-    chat_id = "357035668"
+    chat_id = "123456789"
     past_due = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
     t_id = temp_storage.create_task(chat_id=chat_id, title="Overdue task", due_at=past_due)
 
@@ -88,7 +88,7 @@ def test_pending_reminders(temp_storage):
 
 def test_digests(temp_storage):
     d_id = temp_storage.log_digest(
-        target_chat_id="-1001169201210",
+        target_chat_id="-1001234567890",
         summary_text="Hourly activity: 3 queries.",
         period_start="2026-10-11T14:00:00",
         period_end="2026-10-11T15:00:00",

@@ -151,14 +151,17 @@ class Storage:
 
     def get_tasks(
         self,
-        chat_id: str,
+        chat_id: Optional[str] = None,
         list_name: Optional[str] = None,
         include_completed: bool = False
     ) -> List[Dict[str, Any]]:
         """Retrieve active (or all) tasks for a chat/user."""
         with self._lock, self._get_connection() as conn:
-            conditions = ["chat_id = ?"]
-            params: List[Any] = [chat_id]
+            conditions: List[str] = []
+            params: List[Any] = []
+            if chat_id:
+                conditions.append("chat_id = ?")
+                params.append(str(chat_id).strip())
 
             if not include_completed:
                 conditions.append("is_completed = 0")
@@ -166,8 +169,8 @@ class Storage:
                 conditions.append("list_name = ?")
                 params.append(list_name.lower().strip())
 
-            where_clause = " AND ".join(conditions)
-            query = f"SELECT * FROM tasks WHERE {where_clause} ORDER BY due_at ASC, id DESC"
+            where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+            query = f"SELECT * FROM tasks {where_clause} ORDER BY due_at ASC, id DESC"
             rows = conn.execute(query, params).fetchall()
             return [dict(r) for r in rows]
 

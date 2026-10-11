@@ -624,7 +624,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           </div>
           <div style="padding: 1rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 0.75rem;">
             <div style="font-weight: 700; color: #6ee7b7;">🛡️ Whitelist Telegram Security</div>
-            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 0.25rem;">Interactive chat restricted strictly to ID <code>357035668</code>. Silent reports to group <code>-1001169201210</code>.</div>
+            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 0.25rem;">Interactive chat restricted strictly to ID <code></code>. Silent reports to group <code></code>.</div>
           </div>
           <div style="padding: 1rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 0.75rem;">
             <div style="font-weight: 700; color: #38bdf8;">📝 Markdown Persistent Memory</div>
@@ -976,7 +976,7 @@ def create_web_server(
                 self._send_html(DASHBOARD_HTML)
             elif path == "/api/stats":
                 interactions = storage.get_interactions(limit=100) if storage else []
-                tasks = storage.get_tasks("357035668", include_completed=False) if storage else []
+                tasks = storage.get_tasks(include_completed=False) if storage else []
                 self._send_json({
                     "status": "ok",
                     "total_interactions": len(interactions),
@@ -987,7 +987,7 @@ def create_web_server(
                 items = storage.get_interactions(limit=50) if storage else []
                 self._send_json(items)
             elif path == "/api/tasks":
-                tasks = storage.get_tasks("357035668", include_completed=True) if storage else []
+                tasks = storage.get_tasks(include_completed=True) if storage else []
                 self._send_json(tasks)
             elif path == "/api/notes":
                 notes_list = list_notes()
@@ -1038,7 +1038,7 @@ def create_web_server(
                 title = body.get("title", "").strip()
                 list_name = body.get("list_name", "default").strip()
                 if title and storage:
-                    tid = storage.create_task("357035668", title, list_name=list_name)
+                    tid = storage.create_task("web", title, list_name=list_name)
                     self._send_json({"status": "ok", "id": tid})
                 else:
                     self._send_json({"error": "Title required"}, status=400)

@@ -19,8 +19,8 @@ class Scheduler:
         self,
         bot: Any,
         storage: Any,
-        admin_chat_id: str = "357035668",
-        report_chat_id: str = "-1001169201210",
+        admin_chat_id: str = "",
+        report_chat_id: str = "",
         tz_name: str = "Asia/Kolkata",
         dashboard_url: str = "https://pithon.trylocalhost.com"
     ):
