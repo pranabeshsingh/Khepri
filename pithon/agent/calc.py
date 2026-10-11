@@ -3,7 +3,7 @@
 import ast
 import math
 import operator
-from typing import Any, Union
+from typing import Union
 
 _SAFE_OPERATORS = {
     ast.Add: operator.add,

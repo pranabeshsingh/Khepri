@@ -1,9 +1,8 @@
 """Low-level model loader, memory headroom checks, and generation loop."""
 
 import os
-import sys
 import time
-from typing import Iterator, Optional
+from typing import Iterator
 from pithon.template import detect_model_type
 
 def check_memory_headroom(min_free_mb: int = 100) -> bool:

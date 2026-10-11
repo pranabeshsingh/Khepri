@@ -5,7 +5,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 import zoneinfo
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple
 
 from pithon.agent.calc import safe_calculate
 from pithon.agent.weather import get_weather_report

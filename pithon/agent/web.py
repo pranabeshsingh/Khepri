@@ -3,17 +3,13 @@
 import http.cookies
 import json
 import logging
-import os
-import re
 import secrets
-import time
 import urllib.parse
-from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from pithon.agent.search import should_search, search_duckduckgo, format_search_context
-from pithon.agent.time_context import get_current_time_info, format_temporal_prompt_header
+from pithon.agent.time_context import format_temporal_prompt_header
 from pithon.agent.memory import list_notes, get_note_content
 
 logger = logging.getLogger("pithon.web")

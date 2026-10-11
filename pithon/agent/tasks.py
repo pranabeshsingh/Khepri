@@ -3,7 +3,7 @@
 import re
 from datetime import datetime, timedelta, timezone
 import zoneinfo
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Tuple
 
 TASK_INTENT_PATTERNS = [
     r"^/add\b",
@@ -159,7 +159,7 @@ def format_reminder_alert(task: Dict[str, Any]) -> Tuple[str, List[List[Dict[str
         )
         inline_keyboard = [
             [
-                {"text": f"✅ Mark Completed", "callback_data": f"done:{tid}"},
+                {"text": "✅ Mark Completed", "callback_data": f"done:{tid}"},
                 {"text": "⏰ Snooze 1 Hour", "callback_data": f"snooze:{tid}"}
             ]
         ]

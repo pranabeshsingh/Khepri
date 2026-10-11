@@ -1,10 +1,11 @@
 """Structured live weather service with zero-API-key requirements."""
 
 import json
+import re
 import logging
 import urllib.parse
 import urllib.request
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 logger = logging.getLogger("pithon.weather")
 
@@ -74,7 +75,6 @@ def get_weather_report(location: str) -> Dict[str, Any]:
                 "summary": f"⚠️ Could not fetch live weather for '{loc_clean}'. Please try again."
             }
 
-import re
 
 def is_weather_intent(text: str) -> bool:
     """Check if the text represents an inquiry about weather or temperature."""

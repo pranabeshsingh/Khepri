@@ -1,0 +1,94 @@
+name: Docker CI
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'Dockerfile*'
+      - 'docker-compose.yml'
+      - 'docker-entrypoint.sh'
+      - 'pithon/**'
+      - 'scripts/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - '.github/workflows/docker.yml'
+  pull_request:
+    branches: [ master, main ]
+    paths:
+      - 'Dockerfile*'
+      - 'docker-compose.yml'
+      - 'docker-entrypoint.sh'
+      - 'pithon/**'
+      - 'scripts/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - '.github/workflows/docker.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-compose:
+    name: Validate Docker Compose Config
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Create mock environment file
+        run: |
+          cat << 'ENVEOF' > .env
+          TELEGRAM_BOT_TOKEN=0000000000:AA_mock_token_for_ci_testing_only
+          TELEGRAM_ADMIN_CHAT_ID=123456789
+          TELEGRAM_REPORT_CHAT_ID=123456789
+          PORTAL_PASSPHRASE=ci_mock_passphrase_testing
+          ENVEOF
+
+      - name: Validate docker-compose.yml syntax and schema
+        run: |
+          docker compose config --quiet
+          echo "docker-compose.yml configuration is valid"
+
+  build-and-test:
+    name: Build & Smoke Test (${{ matrix.target.name }} - ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: validate-compose
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+        target:
+          - name: pithon-daemon
+            dockerfile: Dockerfile
+            tag: pithon:test
+            smoke_test: |
+              docker run --rm pithon:test pithon --help
+              docker run --rm pithon:test python3 -c "import pithon; import llama_cpp; print('Daemon container and C++ bindings verified successfully')"
+          - name: pithon-agent
+            dockerfile: Dockerfile.agent
+            tag: pithon-agent:test
+            smoke_test: |
+              docker run --rm pithon-agent:test python3 -c "import pithon; from pithon.agent.storage import Storage; print('Agent container verified successfully')"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and load Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.target.dockerfile }}
+          load: true
+          tags: ${{ matrix.target.tag }}
+          cache-from: type=gha,scope=${{ matrix.target.name }}-${{ matrix.os }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target.name }}-${{ matrix.os }}
+
+      - name: Run smoke tests
+        run: |
+          ${{ matrix.target.smoke_test }}

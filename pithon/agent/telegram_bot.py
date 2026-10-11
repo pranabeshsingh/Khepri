@@ -6,19 +6,18 @@ import re
 import time
 import urllib.parse
 import urllib.request
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 
 from pithon.agent.search import should_search, search_duckduckgo, format_search_context
 from pithon.agent.time_context import get_current_time_info, format_temporal_prompt_header
 from pithon.agent.tasks import (
     is_task_intent,
     parse_task_text,
-    format_tasks_message,
-    format_reminder_alert
+    format_tasks_message
 )
 from pithon.agent.calc import safe_calculate
 from pithon.agent.weather import get_weather_report, is_weather_intent, extract_weather_location
-from pithon.agent.memory import save_note, search_notes, list_notes
+from pithon.agent.memory import list_notes
 from pithon.agent.tools import (
     format_tools_system_prompt,
     extract_tool_call,

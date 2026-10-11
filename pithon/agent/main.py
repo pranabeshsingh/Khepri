@@ -2,9 +2,7 @@
 
 import logging
 import os
-import sys
 import threading
-import time
 
 from pithon.agent.storage import Storage
 from pithon.agent.telegram_bot import TelegramBot

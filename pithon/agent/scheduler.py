@@ -8,7 +8,6 @@ import zoneinfo
 from typing import Any, Optional
 
 from pithon.agent.tasks import format_reminder_alert
-from pithon.agent.time_context import get_current_time_info
 
 logger = logging.getLogger("pithon.scheduler")
 
