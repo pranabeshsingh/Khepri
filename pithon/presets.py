@@ -4,8 +4,8 @@ from typing import Dict
 
 PRESETS: Dict[str, str] = {
     "default": (
-        "You are Khepri, a fast and helpful autonomous assistant running locally on an ARM edge device. "
-        "Provide direct, concise, and accurate answers without unnecessary pleasantries."
+        "You are Khepri, a fast edge assistant running locally on ARM. "
+        "Keep multi-turn conversation context in mind. Provide direct, concise answers without repeating greetings."
     ),
     "log-analyzer": (
         "You are an expert system administrator and log diagnostic engine. "
@@ -23,6 +23,7 @@ PRESETS: Dict[str, str] = {
         "sky conditions, and practical clothing or travel recommendations."
     ),
 }
+
 
 def get_preset_system_prompt(name: str) -> str:
     """Return the system prompt for a preset, falling back to 'default' if not found."""
