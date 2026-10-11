@@ -9,8 +9,8 @@ DEST_DIR="${2:-models}"
 QWEN_URL="https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
 QWEN_FILE="qwen2.5-0.5b-instruct-q4_k_m.gguf"
 
-SMOLLM_URL="https://huggingface.co/HuggingFaceTB/SmolLM-135M-Instruct-GGUF/resolve/main/smollm-135m-instruct-q4_k_m.gguf"
-SMOLLM_FILE="smollm-135m-instruct-q4_k_m.gguf"
+SMOLLM_URL="https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF/resolve/main/SmolLM2-135M-Instruct-Q4_K_M.gguf"
+SMOLLM_FILE="SmolLM2-135M-Instruct-Q4_K_M.gguf"
 
 mkdir -p "$DEST_DIR"
 
@@ -19,14 +19,14 @@ download_one() {
     local name="$2"
     local target="$DEST_DIR/$name"
 
-    if [ -f "$target" ]; then
+    if [ -f "$target" ] && [ $(stat -f%z "$target" 2>/dev/null || stat -c%s "$target" 2>/dev/null || echo 0) -gt 10000000 ]; then
         echo "==> Model already exists: $target"
         return 0
     fi
 
     echo "==> Downloading $name..."
     if command -v curl >/dev/null 2>&1; then
-        curl -L --progress-bar -o "$target" "$url"
+        curl -L --fail --progress-bar -o "$target" "$url"
     elif command -v wget >/dev/null 2>&1; then
         wget -O "$target" "$url"
     else

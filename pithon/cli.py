@@ -25,6 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
     pipe_parser.add_argument("--preset", default="log-analyzer", help="System prompt preset (default: log-analyzer)")
     pipe_parser.add_argument("--model", default=DEFAULT_MODEL, help="Path to GGUF model file")
     pipe_parser.add_argument("--threads", type=int, default=3, help="Worker CPU threads (default: 3)")
+    pipe_parser.add_argument("--batch", type=int, default=128, help="Batch evaluation size (default: 128)")
     pipe_parser.add_argument("--mock", action="store_true", help="Run in mock simulation mode (no model needed)")
 
     # Chat subcommand
@@ -32,6 +33,7 @@ def build_parser() -> argparse.ArgumentParser:
     chat_parser.add_argument("--preset", default="default", help="System prompt preset (default: default)")
     chat_parser.add_argument("--model", default=DEFAULT_MODEL, help="Path to GGUF model file")
     chat_parser.add_argument("--threads", type=int, default=3, help="Worker CPU threads (default: 3)")
+    chat_parser.add_argument("--batch", type=int, default=128, help="Batch evaluation size (default: 128)")
     chat_parser.add_argument("--mock", action="store_true", help="Run in mock simulation mode (no model needed)")
 
     # Serve subcommand
@@ -40,6 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1)")
     serve_parser.add_argument("--model", default=DEFAULT_MODEL, help="Path to GGUF model file")
     serve_parser.add_argument("--threads", type=int, default=3, help="Worker CPU threads (default: 3)")
+    serve_parser.add_argument("--batch", type=int, default=128, help="Batch evaluation size (default: 128)")
     serve_parser.add_argument("--mock", action="store_true", help="Run in mock simulation mode (no model needed)")
 
     return parser
@@ -60,11 +63,11 @@ def main() -> int:
     engine = LlamaEngine(
         model_path=args.model,
         n_threads=getattr(args, "threads", 3),
+        n_batch=getattr(args, "batch", 128),
         mock_mode=getattr(args, "mock", False)
     )
 
     if args.subcommand == "pipe":
-        # Check if stdin is piped
         stdin_content = ""
         if not sys.stdin.isatty():
             stdin_content = sys.stdin.read()
