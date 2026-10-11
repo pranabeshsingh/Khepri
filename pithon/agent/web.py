@@ -2194,6 +2194,8 @@ def create_web_server(
                         payload = json.dumps({
                             "messages": msgs,
                             "temperature": 0.25,
+                            "presence_penalty": 0.3,
+                            "frequency_penalty": 0.4,
                             "max_tokens": 512
                         }).encode("utf-8")
                         req = urllib.request.Request(

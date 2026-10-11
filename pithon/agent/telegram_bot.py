@@ -523,7 +523,9 @@ class TelegramBot:
         payload = {
             "messages": messages,
             "max_tokens": 512,
-            "temperature": 0.2
+            "temperature": 0.2,
+            "presence_penalty": 0.3,
+            "frequency_penalty": 0.4
         }
         data = json.dumps(payload).encode("utf-8")
         headers = {"Content-Type": "application/json"}
