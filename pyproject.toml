@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pithon"
+version = "0.1.0"
+description = "Lightweight SLM runtime for Raspberry Pi 3 (log diagnostics, chat, loopback API)"
+authors = [{ name = "Pranabesh" }]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "llama-cpp-python>=0.2.80",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+pithon = "pithon.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pithon*"]
