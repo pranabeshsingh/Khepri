@@ -13,15 +13,17 @@ WORKDIR /app
 # Copy dependency requirements
 COPY pyproject.toml requirements.txt README.md ./
 
-# Install llama-cpp-python and project
+# Install llama-cpp-python (cached layer)
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir llama-cpp-python && \
-    pip install --no-cache-dir -e .
+    pip install --no-cache-dir llama-cpp-python
 
 # Copy application code and scripts
 COPY pithon/ ./pithon/
 COPY scripts/ ./scripts/
 RUN chmod +x ./scripts/*.sh
+
+# Install pithon package with package files present
+RUN pip install --no-cache-dir -e .
 
 # Create models directory
 RUN mkdir -p /app/models
