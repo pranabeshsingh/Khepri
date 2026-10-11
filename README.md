@@ -136,6 +136,32 @@ pithon serve --mock
 
 ---
 
+---
+
+## Docker Deployment (Resource-Constrained Multi-Service Hosts)
+
+When running Pithon alongside critical background services (e.g. OwnTracks, MQTT brokers, databases) on low-resource ARM or x86 VPS instances (like Oracle Cloud 2-core ARM), Pithon can be deployed using Docker with strict cgroup isolation to guarantee zero CPU or RAM starvation for other workloads.
+
+### 1. Launch with Docker Compose
+```bash
+docker compose up -d --build
+```
+
+### 2. Resource Limits & Port Isolation
+* **CPU Limit (`cpus: 1.0`)**: Caps Pithon to at most 1 CPU core, guaranteeing the host and co-located services always have dedicated CPU headroom.
+* **Memory Limit (`mem_limit: 2048m`)**: Strict 2 GB hard limit. Pithon with Qwen2.5-0.5B runs at ~780 MB RSS, leaving massive headroom while protecting the host.
+* **Network Binding (`127.0.0.1:8090:8080`)**: Binds exclusively to host loopback port 8090. Not exposed to the public internet, avoiding port collisions.
+
+### 3. Query the Running Daemon
+Query directly via curl or the helper script:
+```bash
+# Direct curl
+curl -s http://127.0.0.1:8090/health
+
+# Stream log diagnostics into the daemon
+dmesg | ./scripts/query_daemon.sh "Identify hardware errors"
+```
+
 ## License
 
 Apache-2.0
