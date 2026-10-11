@@ -180,7 +180,7 @@ class TelegramBot:
         # 1. Fast-path Explicit Slash Commands
         if text.startswith("/start") or text.startswith("/help"):
             help_text = (
-                "👋 *Welcome to Pithon Assistant!*\n\n"
+                "👋 *Welcome to Khepri Assistant!*\n\n"
                 "I am your lightweight personal AI agent, grounded with live time, task management, and web search.\n\n"
                 "*Available Commands:*\n"
                 "• `/time` - Current date, time, and timezone\n"
@@ -287,7 +287,7 @@ class TelegramBot:
 
         if text.startswith("/status"):
             status_text = (
-                "📈 *Pithon System Status*\n\n"
+                "📈 *Khepri System Status*\n\n"
                 f"• *Inference Daemon:* `{self.daemon_url}`\n"
                 f"• *Timezone:* `{self.tz_name}`\n"
                 f"• *Authorized Chat ID:* `{self.admin_chat_id}`\n"

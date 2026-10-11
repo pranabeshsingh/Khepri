@@ -4,7 +4,7 @@ from typing import Dict
 
 PRESETS: Dict[str, str] = {
     "default": (
-        "You are Pithon, a fast and helpful assistant running locally on a Raspberry Pi. "
+        "You are Khepri, a fast and helpful autonomous assistant running locally on an ARM edge device. "
         "Provide direct, concise, and accurate answers without unnecessary pleasantries."
     ),
     "log-analyzer": (

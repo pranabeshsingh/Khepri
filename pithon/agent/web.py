@@ -21,7 +21,7 @@ LOGIN_HTML = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pithon • Agent Command Center</title>
+  <title>Khepri • Management Portal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -274,9 +274,9 @@ LOGIN_HTML = """<!DOCTYPE html>
     <div class="card-halo"></div>
     <div class="card">
       <div class="header">
-        <div class="logo-badge">π</div>
+        <div class="logo-badge" style="padding: 4px; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 26px; height: 26px;"><circle cx="60" cy="24" r="8"/><circle cx="60" cy="24" r="13" stroke-dasharray="2 3" stroke-width="1.5"/><path d="M 60 7 L 60 12"/><path d="M 60 36 L 60 41"/><path d="M 43 24 L 48 24"/><path d="M 72 24 L 77 24"/><path d="M 52 46 C 46 38 46 28 51 22"/><path d="M 68 46 C 74 38 74 28 69 22"/><path d="M 54 46 Q 60 43 66 46 L 68 50 Q 60 52 52 50 Z"/><path d="M 50 51 Q 60 48 70 51 L 73 58 Q 60 61 47 58 Z"/><path d="M 47 54 C 36 44 26 32 23 20 C 21 34 26 48 37 60"/><path d="M 73 54 C 84 44 94 32 97 20 C 99 34 94 48 83 60"/><path d="M 47 58 C 43 72 45 88 60 96 C 75 88 77 72 73 58 Z"/><path d="M 60 59 L 60 96"/><path d="M 60 63 L 67 70 L 60 77 L 53 70 Z"/><path d="M 44 65 L 34 73 L 33 83"/><path d="M 76 65 L 86 73 L 87 83"/><path d="M 47 84 L 37 94 L 40 106"/><path d="M 73 84 L 83 94 L 80 106"/></svg></div>
         <div>
-          <h1>Pithon Agent</h1>
+          <h1>Khepri</h1>
           <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 0.2rem; font-weight: 500;">Management Portal</div>
           <div class="status-pill" style="margin-top: 0.45rem;">
             <span class="status-dot"></span>
@@ -365,7 +365,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pithon • Agent Command Center</title>
+  <title>Khepri • Management Portal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -562,9 +562,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <body>
   <header>
     <div class="brand">
-      <div class="badge">π</div>
+      <div class="badge" style="padding: 3px; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 22px; height: 22px;"><circle cx="60" cy="24" r="8"/><circle cx="60" cy="24" r="13" stroke-dasharray="2 3" stroke-width="1.5"/><path d="M 60 7 L 60 12"/><path d="M 60 36 L 60 41"/><path d="M 43 24 L 48 24"/><path d="M 72 24 L 77 24"/><path d="M 52 46 C 46 38 46 28 51 22"/><path d="M 68 46 C 74 38 74 28 69 22"/><path d="M 54 46 Q 60 43 66 46 L 68 50 Q 60 52 52 50 Z"/><path d="M 50 51 Q 60 48 70 51 L 73 58 Q 60 61 47 58 Z"/><path d="M 47 54 C 36 44 26 32 23 20 C 21 34 26 48 37 60"/><path d="M 73 54 C 84 44 94 32 97 20 C 99 34 94 48 83 60"/><path d="M 47 58 C 43 72 45 88 60 96 C 75 88 77 72 73 58 Z"/><path d="M 60 59 L 60 96"/><path d="M 60 63 L 67 70 L 60 77 L 53 70 Z"/><path d="M 44 65 L 34 73 L 33 83"/><path d="M 76 65 L 86 73 L 87 83"/><path d="M 47 84 L 37 94 L 40 106"/><path d="M 73 84 L 83 94 L 80 106"/></svg></div>
       <div>
-        <div class="brand-title">Pithon Mini-OpenClaw</div>
+        <div class="brand-title">Khepri</div>
         <div style="font-size: 0.72rem; color: #10b981; font-weight: 600;">● Online • Asia/Kolkata</div>
       </div>
     </div>

@@ -47,7 +47,7 @@ def main() -> None:
     port = int(os.environ.get("PORT", "8080"))
     db_path = os.environ.get("DB_PATH", "data/pithon.db").strip()
 
-    logger.info("Initializing Pithon Agent Storage...")
+    logger.info("Initializing Khepri Agent Storage...")
     storage = Storage(db_path)
 
     # 1. Initialize Telegram Bot
@@ -94,7 +94,7 @@ def main() -> None:
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        logger.info("Shutting down Pithon Agent services...")
+        logger.info("Shutting down Khepri Agent services...")
     finally:
         server.server_close()
 
