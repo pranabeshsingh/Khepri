@@ -17,7 +17,7 @@ from pithon.presets import get_preset_system_prompt
 from pithon.agent.memory import list_notes, get_note_content, save_note, delete_note
 from pithon.agent.calc import safe_calculate
 from pithon.agent.weather import get_weather_report, is_weather_intent, extract_weather_location
-from pithon.agent.tools import format_tools_system_prompt, extract_tool_call, execute_tool_call
+from pithon.agent.tools import extract_tool_call, execute_tool_call
 
 logger = logging.getLogger("pithon.web")
 
@@ -2172,11 +2172,10 @@ def create_web_server(
                 if not reply_text:
                     temporal_header = format_temporal_prompt_header(tz_name)
                     base_prompt = get_preset_system_prompt(preset)
-                    tools_system = format_tools_system_prompt()
-                    sys_prompt = f"{temporal_header}\n\n{tools_system}\n\n{base_prompt}"
+                    sys_prompt = temporal_header + "\n" + base_prompt
 
                     # Pull recent multi-turn history from SQLite
-                    recent_history = storage.get_recent_history(limit=6, chat_id=admin_id) if storage else []
+                    recent_history = storage.get_recent_history(limit=3, chat_id=admin_id) if storage else []
 
                     # Check DuckDuckGo search
                     search_ctx = ""

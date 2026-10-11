@@ -133,7 +133,7 @@ class Storage:
 
     def get_recent_history(
         self,
-        limit: int = 6,
+        limit: int = 3,
         chat_id: Optional[str] = None
     ) -> List[Dict[str, str]]:
         """Retrieve recent interaction turns in chronological order for conversational multi-turn context."""
@@ -143,6 +143,7 @@ class Storage:
                 SELECT prompt, response FROM interactions
                 WHERE (chat_id = ? OR chat_id = 'web' OR user_id = 'web')
                   AND prompt != '' AND response != ''
+                  AND response NOT LIKE '%⚠️%' AND response NOT LIKE '%timed out%'
                 ORDER BY id DESC LIMIT ?
                 """
                 rows = conn.execute(query, (str(chat_id), limit)).fetchall()
@@ -150,14 +151,17 @@ class Storage:
                 query = """
                 SELECT prompt, response FROM interactions
                 WHERE prompt != '' AND response != ''
+                  AND response NOT LIKE '%⚠️%' AND response NOT LIKE '%timed out%'
                 ORDER BY id DESC LIMIT ?
                 """
                 rows = conn.execute(query, (limit,)).fetchall()
 
             history = []
             for r in reversed(rows):
-                history.append({"role": "user", "content": r["prompt"]})
-                history.append({"role": "assistant", "content": r["response"]})
+                p_text = r["prompt"][:250].strip()
+                r_text = r["response"][:300].strip()
+                history.append({"role": "user", "content": p_text})
+                history.append({"role": "assistant", "content": r_text})
             return history
 
     def get_chat_stream(

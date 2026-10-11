@@ -386,8 +386,9 @@ class TelegramBot:
         temporal_header = format_temporal_prompt_header(self.tz_name)
         system_prompt = f"{tools_system}\n\n{temporal_header}"
 
+        recent_history = self.storage.get_recent_history(limit=3, chat_id=str(chat_id)) if self.storage else []
         start_t = time.time()
-        answer = self._query_daemon(text, system=system_prompt)
+        answer = self._query_daemon(text, system=system_prompt, history=recent_history)
         latency_ms = int((time.time() - start_t) * 1000)
 
         # Check for Native Qwen2.5 Tool Call
@@ -504,12 +505,19 @@ class TelegramBot:
             )
         self.send_message(chat_id, answer)
 
-    def _query_daemon(self, prompt: str, system: Optional[str] = None) -> str:
+    def _query_daemon(
+        self,
+        prompt: str,
+        system: Optional[str] = None,
+        history: Optional[List[Dict[str, str]]] = None
+    ) -> str:
         """Call Pithon daemon on 127.0.0.1:8090."""
         url = f"{self.daemon_url}/v1/chat/completions"
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
+        if history:
+            messages.extend(history)
         messages.append({"role": "user", "content": prompt})
 
         payload = {
