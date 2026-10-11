@@ -158,3 +158,31 @@ def test_tool_call_web_search(bot):
         assert "Perseverance is currently exploring" in args[1]
         assert "reply_markup" in kwargs
         assert kwargs["reply_markup"]["inline_keyboard"][0][0]["url"] == "https://mars.nasa.gov"
+
+def test_conversational_weather(bot):
+    msg = {
+        "message_id": 40,
+        "chat": {"id": 123456789},
+        "from": {"id": 123456789},
+        "text": "how is the weather in kolkata?"
+    }
+    with patch("pithon.agent.telegram_bot.get_weather_report", return_value={"summary": "🌤️ Weather for Kolkata: 30°C"}), \
+         patch.object(bot, "send_message") as mock_send:
+        bot.handle_message(msg)
+        mock_send.assert_called_once()
+        args, _ = mock_send.call_args
+        assert "30°C" in args[1]
+        assert "Kolkata" in args[1]
+
+def test_conversational_calculate(bot):
+    msg = {
+        "message_id": 41,
+        "chat": {"id": 123456789},
+        "from": {"id": 123456789},
+        "text": "what is 25 * 4?"
+    }
+    with patch.object(bot, "send_message") as mock_send:
+        bot.handle_message(msg)
+        mock_send.assert_called_once()
+        args, _ = mock_send.call_args
+        assert "100" in args[1]

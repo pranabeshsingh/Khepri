@@ -7,8 +7,7 @@ import urllib.request
 from typing import List, Dict, Any
 
 SEARCH_INTENT_KEYWORDS = {
-    "latest", "news", "today", "yesterday", "tomorrow", "weather",
-    "forecast", "current", "currently", "price", "stock", "score",
+    "latest", "news", "today", "yesterday", "tomorrow", "current", "currently", "price", "stock", "score",
     "release", "happened", "who is", "who won", "what is happening",
     "breaking", "recent", "update"
 }

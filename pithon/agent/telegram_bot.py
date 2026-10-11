@@ -17,7 +17,7 @@ from pithon.agent.tasks import (
     format_reminder_alert
 )
 from pithon.agent.calc import safe_calculate
-from pithon.agent.weather import get_weather_report
+from pithon.agent.weather import get_weather_report, is_weather_intent, extract_weather_location
 from pithon.agent.memory import save_note, search_notes, list_notes
 from pithon.agent.tools import (
     format_tools_system_prompt,
@@ -319,6 +319,37 @@ class TelegramBot:
                 for n in notes:
                     lines.append(f"• *{n['title']}* (`{n['filename']}`)")
                 self.send_message(chat_id, "\n".join(lines))
+            return
+
+        # Direct conversational weather intent (e.g. 'how is the weather in kolkata?')
+        if is_weather_intent(text):
+            loc = extract_weather_location(text)
+            report = get_weather_report(loc)
+            ans = report.get("summary", "No weather data.")
+            if self.storage:
+                self.storage.log_interaction(
+                    chat_id=str(chat_id),
+                    user_id=str(msg.get("from", {}).get("id", "")),
+                    prompt=text,
+                    response=ans
+                )
+            self.send_message(chat_id, ans)
+            return
+
+        # Direct calculation intent (e.g. 'calculate 25 * 4', 'what is 4320 / 6?')
+        calc_m = re.search(r"^(?:calculate|calc|what is)\s+([0-9\.\s\+\-\*\/\(\)\^\%]+)[?]?$", text, re.IGNORECASE)
+        if calc_m:
+            expr = calc_m.group(1).strip()
+            res = safe_calculate(expr)
+            ans = f"🧮 `{expr}` = *{res}*"
+            if self.storage:
+                self.storage.log_interaction(
+                    chat_id=str(chat_id),
+                    user_id=str(msg.get("from", {}).get("id", "")),
+                    prompt=text,
+                    response=ans
+                )
+            self.send_message(chat_id, ans)
             return
 
         # 2. Conversational Intent via Native Qwen2.5 Tool Calling & Temporal Grounding

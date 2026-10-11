@@ -73,3 +73,21 @@ def get_weather_report(location: str) -> Dict[str, Any]:
                 "location": loc_clean,
                 "summary": f"⚠️ Could not fetch live weather for '{loc_clean}'. Please try again."
             }
+
+import re
+
+def is_weather_intent(text: str) -> bool:
+    """Check if the text represents an inquiry about weather or temperature."""
+    clean = text.lower().strip()
+    return bool(re.search(r"\b(?:weather|temperature|forecast|temp|rain|raining)\b", clean))
+
+def extract_weather_location(text: str) -> str:
+    """Extract location name from a weather query, defaulting to Kolkata."""
+    m = re.search(r"\b(?:in|at|for|of)\s+([a-zA-Z\s]+?)(?:\?|$|\.|\btoday\b|\bcurrently\b|\bnow\b)", text, re.IGNORECASE)
+    if m:
+        loc = m.group(1).strip()
+        if len(loc) > 1:
+            return loc
+    clean = re.sub(r"\b(how|what|is|the|weather|temperature|forecast|temp|like|today|now|in|at|for|of|please|tell|me|rain|raining)\b", "", text, flags=re.IGNORECASE)
+    clean = re.sub(r"[?!.]+", "", clean).strip()
+    return clean if len(clean) > 1 else "Kolkata"
