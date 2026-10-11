@@ -129,7 +129,7 @@ Transform Pithon into a lightweight, always-on personal AI assistant ("Mini-Open
   - Updates `reminded = 1`.
 
 ### 3.4. Telegram Bot Router (`pithon/agent/telegram_bot.py`)
-- **Long-Polling**: Uses Telegram Bot API `getUpdates` with `timeout=30`.
+- **Long-Polling**: Uses Telegram Bot API `getUpdates` with `timeout=30` handling both `message` and `callback_query` updates.
 - **Chat Whitelist**:
   - `chat_id == 357035668`:
     - Process message, trigger `sendChatAction(action="typing")`, execute search/SLM pipeline, record interaction in SQLite, respond via `sendMessage` (chunked at 4000 characters).
@@ -138,6 +138,25 @@ Transform Pithon into a lightweight, always-on personal AI assistant ("Mini-Open
     - Destination for hourly digests only.
   - Any other `chat_id`:
     - Silently dropped.
+
+#### Interactive Telegram UX (Inline Keyboards, Buttons & Polls)
+- **Interactive Task Buttons**:
+  - When listing tasks (`/todo`, `/tasks`) or dispatching scheduled reminders, messages include inline action buttons:
+    `[ ✅ Done: #id ]` `[ ⏰ Snooze 1h: #id ]` `[ 🗑️ Delete: #id ]`
+  - Clicking any button triggers a Telegram `callback_query`. The bot answers via `answerCallbackQuery(text="Task marked done! ✅")` and updates the message text in-place using `editMessageText` with strikethrough completion formatting.
+- **Direct Source URL Buttons on Search Results**:
+  - Whenever DuckDuckGo search results are referenced in a response, the bot appends inline URL buttons directly linking to the retrieved sources:
+    `[ 🌐 1. <Site Name> ]` `[ 🌐 2. <Site Name> ]` `[ 🌐 3. <Site Name> ]`
+  - Tapping opens the article directly in the user browser/in-app viewer.
+- **Interactive Quick Action Menu (Reply Keyboard)**:
+  - Persistent/collapsible menu with buttons for one-tap execution:
+    `[ 📋 My Tasks ] [ 🔍 Search ] [ 🕒 Date & Time ] [ 📈 System Status ]`
+- **Native Telegram Polls (`sendPoll`)**:
+  - Command `/poll "Question" "Option 1" "Option 2" ...` creates an official interactive Telegram poll.
+  - Natural language trigger: asking Pithon to "Create a poll for..." extracts the question and choices and calls `sendPoll`.
+- **Hourly Digest Interactive Link**:
+  - Every silent hourly digest includes an inline web app button:
+    `[ 📊 Open Dashboard ](https://pithon.trylocalhost.com)`
 - **Hourly Digest Dispatcher**:
   - Runs at minute `00` of every hour.
   - Aggregates activity from `[now - 1 hour, now]`:
