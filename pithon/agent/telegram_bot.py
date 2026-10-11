@@ -16,6 +16,9 @@ from pithon.agent.tasks import (
     format_tasks_message,
     format_reminder_alert
 )
+from pithon.agent.calc import safe_calculate
+from pithon.agent.weather import get_weather_report
+from pithon.agent.memory import save_note, search_notes, list_notes
 from pithon.agent.tools import (
     format_tools_system_prompt,
     extract_tool_call,
@@ -293,6 +296,29 @@ class TelegramBot:
                 "• *Container Health:* Normal (cgroups: 0.5 CPU, 512M RAM)"
             )
             self.send_message(chat_id, status_text)
+            return
+
+        if text.startswith("/calc "):
+            expr = text[6:].strip()
+            res = safe_calculate(expr)
+            self.send_message(chat_id, f"🧮 `{expr}` = *{res}*")
+            return
+
+        if text.startswith("/weather"):
+            loc = text[8:].strip() or "Bangalore"
+            report = get_weather_report(loc)
+            self.send_message(chat_id, report.get("summary", "No weather data."))
+            return
+
+        if text.startswith("/notes"):
+            notes = list_notes()
+            if not notes:
+                self.send_message(chat_id, "📝 No saved notes. Send 'Remember that...' or `/note <title> <text>` to save.")
+            else:
+                lines = ["📝 *Saved Markdown Notes:*\n"]
+                for n in notes:
+                    lines.append(f"• *{n['title']}* (`{n['filename']}`)")
+                self.send_message(chat_id, "\n".join(lines))
             return
 
         # 2. Conversational Intent via Native Qwen2.5 Tool Calling & Temporal Grounding
