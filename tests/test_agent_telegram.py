@@ -106,7 +106,7 @@ def test_tool_call_timer(bot, mock_storage):
         bot.handle_message(msg)
         mock_send.assert_called_once()
         args, kwargs = mock_send.call_args
-        assert "Timer Started!" in args[1]
+        assert "Timer set:" in args[1]
         assert "Boil Eggs" in args[1]
         assert "reply_markup" in kwargs
         assert "inline_keyboard" in kwargs["reply_markup"]

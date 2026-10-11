@@ -47,7 +47,7 @@ def test_execute_tool_call_set_timer(tmp_path):
         "arguments": {"duration": 15, "unit": "minutes", "label": "tea"}
     }
     reply, markup, ctx = execute_tool_call(tool_call, storage, "12345")
-    assert "Timer Started!" in reply
+    assert "Timer set:" in reply
     assert "tea" in reply
     assert markup is not None
     assert len(markup["inline_keyboard"]) == 1
@@ -94,3 +94,73 @@ def test_execute_tool_call_web_search(monkeypatch):
     assert ctx["query"] == "test query"
     assert markup is not None
     assert markup["inline_keyboard"][0][0]["url"] == "https://example.com"
+
+def test_caveman_ultra_prompt():
+    prompt = format_tools_system_prompt()
+    assert "Caveman Ultra" in prompt
+    assert "Drop articles" in prompt
+    assert "calculate" in prompt
+    assert "get_weather" in prompt
+    assert "save_note" in prompt
+    assert "search_notes" in prompt
+    assert "list_tasks" in prompt
+
+def test_execute_tool_call_calculate():
+    tool_call = {
+        "name": "calculate",
+        "arguments": {"expression": "(4320 / 6) * 1.18"}
+    }
+    reply, markup, ctx = execute_tool_call(tool_call, None, "12345")
+    assert "849.6" in reply
+    assert ctx["result"] == "849.6"
+
+def test_execute_tool_call_weather(monkeypatch):
+    import pithon.agent.tools
+    monkeypatch.setattr(
+        pithon.agent.tools,
+        "get_weather_report",
+        lambda loc: {"success": True, "location": "Bangalore", "summary": "🌤️ Weather for Bangalore: 28C"}
+    )
+    tool_call = {
+        "name": "get_weather",
+        "arguments": {"location": "Bangalore"}
+    }
+    reply, markup, ctx = execute_tool_call(tool_call, None, "12345")
+    assert "Bangalore" in reply
+    assert "28C" in reply
+
+def test_execute_tool_call_save_and_search_notes(tmp_path, monkeypatch):
+    notes_dir = str(tmp_path / "notes")
+    monkeypatch.setenv("NOTES_DIR", notes_dir)
+
+    tool_save = {
+        "name": "save_note",
+        "arguments": {"title": "Locker Code", "content": "9876 master"}
+    }
+    reply, markup, ctx = execute_tool_call(tool_save, None, "12345")
+    assert "Saved note" in reply
+    assert "locker-code.md" in reply
+
+    tool_search = {
+        "name": "search_notes",
+        "arguments": {"query": "locker"}
+    }
+    reply_s, _, ctx_s = execute_tool_call(tool_search, None, "12345")
+    assert "Locker Code" in reply_s
+    assert "9876 master" in reply_s
+
+def test_execute_tool_call_list_tasks(tmp_path):
+    db_file = str(tmp_path / "test.db")
+    storage = Storage(db_file)
+    storage.create_task("12345", "Buy groceries", list_name="food")
+    storage.create_task("12345", "Fix bike", list_name="errands")
+
+    tool_call = {
+        "name": "list_tasks",
+        "arguments": {}
+    }
+    reply, markup, ctx = execute_tool_call(tool_call, storage, "12345")
+    assert "Buy groceries" in reply
+    assert "Fix bike" in reply
+    assert markup is not None
+    assert len(markup["inline_keyboard"]) == 2
