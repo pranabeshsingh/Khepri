@@ -68,6 +68,11 @@ class Storage:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 expires_at TIMESTAMP NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS context_resets (
+                chat_id TEXT PRIMARY KEY,
+                cleared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
             """)
 
     def get_table_names(self) -> List[str]:
@@ -131,6 +136,27 @@ class Storage:
                 res.append(item)
             return res
 
+    def clear_context(self, chat_id: Optional[str] = None) -> None:
+        """Clear conversational context memory for a chat/user while preserving audit logs."""
+        target = str(chat_id or "web")
+        with self._lock, self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO context_resets (chat_id, cleared_at)
+                VALUES (?, CURRENT_TIMESTAMP)
+                ON CONFLICT(chat_id) DO UPDATE SET cleared_at = CURRENT_TIMESTAMP
+                """,
+                (target,)
+            )
+            conn.execute(
+                """
+                INSERT INTO context_resets (chat_id, cleared_at)
+                VALUES ('web', CURRENT_TIMESTAMP)
+                ON CONFLICT(chat_id) DO UPDATE SET cleared_at = CURRENT_TIMESTAMP
+                """
+            )
+            conn.commit()
+
     def get_recent_history(
         self,
         limit: int = 3,
@@ -138,15 +164,35 @@ class Storage:
     ) -> List[Dict[str, str]]:
         """Retrieve recent interaction turns in chronological order for conversational multi-turn context."""
         with self._lock, self._get_connection() as conn:
+            cleared_at = None
             if chat_id:
-                query = """
-                SELECT prompt, response FROM interactions
-                WHERE (chat_id = ? OR chat_id = 'web' OR user_id = 'web')
-                  AND prompt != '' AND response != ''
-                  AND response NOT LIKE '%⚠️%' AND response NOT LIKE '%timed out%'
-                ORDER BY id DESC LIMIT ?
-                """
-                rows = conn.execute(query, (str(chat_id), limit)).fetchall()
+                reset_row = conn.execute(
+                    "SELECT cleared_at FROM context_resets WHERE chat_id = ? OR chat_id = 'web' ORDER BY cleared_at DESC LIMIT 1",
+                    (str(chat_id),)
+                ).fetchone()
+                if reset_row:
+                    cleared_at = reset_row["cleared_at"]
+
+            if chat_id:
+                if cleared_at:
+                    query = """
+                    SELECT prompt, response FROM interactions
+                    WHERE (chat_id = ? OR chat_id = 'web' OR user_id = 'web')
+                      AND created_at > ?
+                      AND prompt != '' AND response != ''
+                      AND response NOT LIKE '%⚠️%' AND response NOT LIKE '%timed out%'
+                    ORDER BY id DESC LIMIT ?
+                    """
+                    rows = conn.execute(query, (str(chat_id), cleared_at, limit)).fetchall()
+                else:
+                    query = """
+                    SELECT prompt, response FROM interactions
+                    WHERE (chat_id = ? OR chat_id = 'web' OR user_id = 'web')
+                      AND prompt != '' AND response != ''
+                      AND response NOT LIKE '%⚠️%' AND response NOT LIKE '%timed out%'
+                    ORDER BY id DESC LIMIT ?
+                    """
+                    rows = conn.execute(query, (str(chat_id), limit)).fetchall()
             else:
                 query = """
                 SELECT prompt, response FROM interactions

@@ -1808,12 +1808,17 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       sendChatMessage();
     }
 
-    function clearLocalChat() {
+    async function clearLocalChat() {
+      try {
+        await fetch('/api/chat/clear', {method: 'POST'});
+      } catch (e) {
+        console.warn('Error clearing backend context:', e);
+      }
       document.getElementById('chatMessages').innerHTML = `
         <div class="chat-bubble-row">
           <div class="chat-avatar avatar-assistant">🤖</div>
           <div class="bubble-card bubble-assistant">
-            <div>View cleared. New interactions will appear below.</div>
+            <div>🧹 Context cleared. Fresh session started!</div>
           </div>
         </div>
       `;
@@ -2131,6 +2136,11 @@ def create_web_server(
                 else:
                     self._send_json({"error": "Filename required"}, status=400)
 
+            elif path == "/api/chat/clear":
+                if storage:
+                    storage.clear_context(str(admin_id or "web"))
+                self._send_json({"status": "ok", "message": "Context cleared"})
+
             elif path in ("/api/chat/send", "/api/playground"):
                 body = self._read_json_body()
                 prompt = body.get("prompt", "").strip()
@@ -2150,6 +2160,12 @@ def create_web_server(
                     report = get_weather_report(loc)
                     reply_text = report.get("summary", "No weather data.")
 
+                # 1b. Check direct /clear or /reset command
+                if not reply_text and prompt.lower().strip() in ("/clear", "/reset"):
+                    if storage:
+                        storage.clear_context(str(admin_id or "web"))
+                    reply_text = "🧹 *Conversational context cleared!* I have reset previous dialogue turns."
+
                 # 2. Check direct math intent
                 calc_m = re.search(r"^(?:calculate|calc|what is)\s+([0-9\.\s\+\-\*\/\(\)\^\%]+)[?]?$", prompt, re.IGNORECASE)
                 if not reply_text and calc_m:
@@ -2168,11 +2184,54 @@ def create_web_server(
                     else:
                         reply_text = "Usage: `/note <title> <content>`"
 
-                # 4. Fallback to conversational daemon query with multi-turn context
+                # 3b. Check direct /task or /add command
+                if not reply_text and (prompt.startswith("/task ") or prompt.startswith("/add ")):
+                    cmd_len = 6 if prompt.startswith("/task ") else 5
+                    t_title = prompt[cmd_len:].strip()
+                    if t_title and storage:
+                        tid = storage.create_task(str(admin_id or "web"), t_title, list_name="default")
+                        reply_text = f"✅ Added task #{tid}: *{t_title}*"
+                    elif not t_title:
+                        reply_text = "Usage: `/task <task description>`"
+
+                # 3c. Check direct /todo or /tasks command
+                if not reply_text and prompt in ("/todo", "/tasks"):
+                    if storage:
+                        tasks = storage.get_tasks(str(admin_id or "web"))
+                        if tasks:
+                            lines = ["📋 *Active Tasks:*"]
+                            for t in tasks:
+                                status = "✅" if t.get("completed") else "⬜"
+                                lines.append(f"{status} #{t['id']} {t['title']}")
+                            reply_text = "\n".join(lines)
+                        else:
+                            reply_text = "📋 No active tasks found! You're all caught up."
+
+                # 4. Check direct /search command
+                if not reply_text and prompt.startswith("/search "):
+                    s_query = prompt[8:].strip()
+                    if s_query:
+                        s_results = search_duckduckgo(s_query, max_results=3)
+                        if s_results:
+                            s_lines = [f"🔍 *Search results for:* `{s_query}`\n"]
+                            for r in s_results:
+                                s_lines.append(f"• [{r.get('title')}]({r.get('href')})\n  _{r.get('body', '')[:150]}_")
+                            reply_text = "\n\n".join(s_lines)
+                            search_q = s_query
+                        else:
+                            reply_text = f"🔍 No web results found for `{s_query}`."
+                    else:
+                        reply_text = "Usage: `/search <query>`"
+
+                # 5. Fallback to conversational daemon query with multi-turn context
                 if not reply_text:
                     temporal_header = format_temporal_prompt_header(tz_name)
                     base_prompt = get_preset_system_prompt(preset)
-                    sys_prompt = temporal_header + "\n" + base_prompt
+                    if preset in ("default", "general"):
+                        from pithon.agent.tools import format_tools_system_prompt
+                        sys_prompt = f"{format_tools_system_prompt()}\n\n{temporal_header}\n{base_prompt}"
+                    else:
+                        sys_prompt = temporal_header + "\n" + base_prompt
 
                     # Pull recent multi-turn history from SQLite
                     recent_history = storage.get_recent_history(limit=3, chat_id=admin_id) if storage else []
@@ -2183,7 +2242,7 @@ def create_web_server(
                         results = search_duckduckgo(prompt, max_results=3)
                         if results:
                             search_q = prompt
-                            search_ctx = format_search_context(results)
+                            search_ctx = format_search_context(results, prompt)
                             sys_prompt += f"\n\n{search_ctx}"
 
                     msgs = [{"role": "system", "content": sys_prompt}]

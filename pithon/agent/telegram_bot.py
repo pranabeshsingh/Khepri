@@ -206,6 +206,15 @@ class TelegramBot:
             self.send_message(chat_id, help_text, reply_markup=reply_markup)
             return
 
+        if text.strip() in ("/clear", "/reset"):
+            if self.storage:
+                self.storage.clear_context(str(chat_id))
+            self.send_message(
+                chat_id,
+                "🧹 *Conversational context cleared!* I have reset previous conversation turns. What would you like to discuss next?"
+            )
+            return
+
         if text.startswith("/time"):
             info = get_current_time_info(self.tz_name)
             time_msg = (
