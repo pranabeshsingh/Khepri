@@ -1,1 +1,1 @@
-llama-cpp-python>=0.2.80
+llama-cpp-python>=0.3.36
