@@ -1,4 +1,4 @@
-FROM python:3.12-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 # Install build dependencies for llama-cpp-python on ARM64 / x86_64
 RUN apt-get update && apt-get install -y --no-install-recommends \
