@@ -72,14 +72,15 @@ class TelegramBot:
         chat_id: Any,
         text: str,
         reply_markup: Optional[Dict[str, Any]] = None,
-        disable_notification: bool = False
+        disable_notification: bool = False,
+        disable_web_page_preview: bool = False
     ) -> Optional[Dict[str, Any]]:
         """Send a markdown message to a Telegram chat."""
         payload: Dict[str, Any] = {
             "chat_id": chat_id,
             "text": text,
             "parse_mode": "Markdown",
-            "disable_web_page_preview": False,
+            "disable_web_page_preview": disable_web_page_preview,
             "disable_notification": disable_notification
         }
         if reply_markup:
@@ -172,7 +173,7 @@ class TelegramBot:
             self.answer_callback_query(cb_id, text="Generating daily briefing... 📰")
             self.send_chat_action(chat_id, action="typing")
             b_text = generate_daily_briefing(str(chat_id), self.storage, tz_name=self.tz_name)
-            self.send_message(chat_id, b_text)
+            self.send_message(chat_id, b_text, disable_web_page_preview=True)
 
         elif data == "menu:tasks":
             self.answer_callback_query(cb_id, text="Loading tasks... 📋")
@@ -214,7 +215,7 @@ class TelegramBot:
         if text.startswith("/briefing"):
             self.send_chat_action(chat_id, action="typing")
             b_text = generate_daily_briefing(str(chat_id), self.storage, tz_name=self.tz_name)
-            self.send_message(chat_id, b_text)
+            self.send_message(chat_id, b_text, disable_web_page_preview=True)
             return
 
         # Check /init command

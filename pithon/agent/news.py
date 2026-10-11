@@ -124,15 +124,36 @@ def fetch_news_headlines(city: str = "Kolkata", country_code: str = "IN") -> Dic
 
 
 def format_news_section(news_data: Dict[str, List[Dict[str, str]]], city: str = "Kolkata") -> str:
-    """Format news items into a numbered markdown section (1-5 Local, 6-8 National, 9-10 World)."""
+    """Format news items into a numbered markdown section with clickable story links."""
     lines = ["📰 *Top 10 Curated Headlines:*"]
+
+    def _format_item(idx: int, item: Dict[str, str]) -> str:
+        title = item.get("title", "").strip()
+        url = item.get("url", "").strip()
+
+        # Split source attribution if present (e.g. "Headline text - Publisher Name")
+        if " - " in title:
+            headline, source = title.rsplit(" - ", 1)
+        else:
+            headline, source = title, ""
+
+        # Sanitize for Telegram legacy markdown
+        headline = headline.replace("[", "(").replace("]", ")").replace("*", "").replace("_", "").strip()
+        source = source.replace("[", "(").replace("]", ")").replace("*", "").replace("_", "").strip()
+
+        source_tag = f" — _{source}_" if source else ""
+
+        if url:
+            return f"{idx}. [{headline}]({url}){source_tag}"
+        else:
+            return f"{idx}. {headline}{source_tag}"
 
     # Local
     lines.append(f"\n📍 *Local ({city}):*")
     local_items = news_data.get("local", [])
     if local_items:
         for idx, item in enumerate(local_items, 1):
-            lines.append(f"{idx}. {item['title']}")
+            lines.append(_format_item(idx, item))
     else:
         lines.append("• No local headlines available at this moment.")
 
@@ -141,7 +162,7 @@ def format_news_section(news_data: Dict[str, List[Dict[str, str]]], city: str = 
     national_items = news_data.get("national", [])
     if national_items:
         for idx, item in enumerate(national_items, 6):
-            lines.append(f"{idx}. {item['title']}")
+            lines.append(_format_item(idx, item))
     else:
         lines.append("• No national headlines available at this moment.")
 
@@ -150,7 +171,7 @@ def format_news_section(news_data: Dict[str, List[Dict[str, str]]], city: str = 
     world_items = news_data.get("world", [])
     if world_items:
         for idx, item in enumerate(world_items, 9):
-            lines.append(f"{idx}. {item['title']}")
+            lines.append(_format_item(idx, item))
     else:
         lines.append("• No world headlines available at this moment.")
 

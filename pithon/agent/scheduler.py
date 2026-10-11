@@ -150,7 +150,7 @@ class Scheduler:
         briefing = generate_daily_briefing(self.admin_chat_id, self.storage, tz_name=self.tz_name)
         if self.bot and self.admin_chat_id:
             try:
-                self.bot.send_message(self.admin_chat_id, briefing)
+                self.bot.send_message(self.admin_chat_id, briefing, disable_web_page_preview=True)
             except Exception as e:
                 logger.error(f"Failed to send scheduled daily briefing: {e}")
         return briefing

@@ -371,7 +371,7 @@ LOGIN_HTML = """<!DOCTYPE html>
 
 # DASHBOARD_HTML will follow in the next part of script...
 
-DASHBOARD_HTML = """<!DOCTYPE html>
+DASHBOARD_HTML = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -1661,7 +1661,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <span>${m.created_at ? m.created_at.substring(11, 19) : ''}</span>
           </div>
           <div class="activity-prompt">${escapeHtml(m.prompt)}</div>
-          <div class="activity-response">${escapeHtml(m.response)}</div>
+          <div class="activity-response">${formatMarkdown(m.response)}</div>
         </div>
       `).join('');
     }
@@ -1695,7 +1695,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         asstRow.innerHTML = `
           <div class="chat-avatar avatar-assistant">🤖</div>
           <div class="bubble-card bubble-assistant">
-            <div>${escapeHtml(m.response)}</div>
+            <div>${formatMarkdown(m.response)}</div>
             <div class="bubble-meta">
               ${m.latency_ms ? `<span class="tool-chip">⚡ ${m.latency_ms}ms</span>` : ''}
               ${m.search_query ? `<span class="tool-chip">🔍 Web Grounded</span>` : ''}
@@ -1892,6 +1892,23 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+    }
+
+    function formatMarkdown(str) {
+      if (!str) return '';
+      let safe = escapeHtml(str);
+      // Links: [text](url) -> <a href="url" target="_blank" rel="noopener noreferrer">text</a>
+      safe = safe.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline; text-underline-offset: 3px; font-weight: 500;">$1</a>');
+      // Bold: **text** or *text*
+      safe = safe.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
+      safe = safe.replace(/\*([^\*]+)\*/g, '<strong>$1</strong>');
+      // Italics: _text_
+      safe = safe.replace(/_([^_]+)_/g, '<em>$1</em>');
+      // Inline code: `code`
+      safe = safe.replace(/`([^`]+)`/g, '<code style="background: rgba(255,255,255,0.08); padding: 0.15rem 0.35rem; border-radius: 4px; font-family: monospace;">$1</code>');
+      // Line breaks
+      safe = safe.replace(/\n/g, '<br>');
+      return safe;
     }
 
     async function refreshAll() {

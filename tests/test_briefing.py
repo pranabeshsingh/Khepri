@@ -41,6 +41,18 @@ def test_format_news_section():
     assert "10. World News 2" in formatted
 
 
+def test_format_news_section_with_urls():
+    mock_news = {
+        "local": [{"title": "Bengaluru Metro Opens - Deccan Herald", "url": "https://example.com/metro"}],
+        "national": [{"title": "ISRO Lunar Mission Update - The Hindu", "url": "https://example.com/isro"}],
+        "world": [{"title": "Global Climate Summit - BBC", "url": "https://example.com/climate"}],
+    }
+    formatted = format_news_section(mock_news, city="Bengaluru")
+    assert "1. [Bengaluru Metro Opens](https://example.com/metro) — _Deccan Herald_" in formatted
+    assert "6. [ISRO Lunar Mission Update](https://example.com/isro) — _The Hindu_" in formatted
+    assert "9. [Global Climate Summit](https://example.com/climate) — _BBC_" in formatted
+
+
 def test_generate_daily_briefing_standalone(tmp_path):
     db_path = str(tmp_path / "test_pithon.db")
     storage = Storage(db_path)
