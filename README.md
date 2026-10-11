@@ -14,11 +14,11 @@
   </p>
 
   <p>
-    <a href="wiki/Home.md"><strong>Explore the Wiki »</strong></a> •
-    <a href="wiki/Telegram-Bot-Setup.md">Telegram Setup</a> •
-    <a href="wiki/Bot-Commands-and-Tools.md">Commands & Tools</a> •
-    <a href="wiki/Web-Portal-Guide.md">Management Portal</a> •
-    <a href="wiki/Architecture-and-Deployment.md">Architecture</a>
+    <a href="https://github.com/pranabeshsingh/Khepri/wiki"><strong>Explore the Wiki »</strong></a> •
+    <a href="https://github.com/pranabeshsingh/Khepri/wiki/Telegram-Bot-Setup">Telegram Setup</a> •
+    <a href="https://github.com/pranabeshsingh/Khepri/wiki/Bot-Commands-and-Tools">Commands & Tools</a> •
+    <a href="https://github.com/pranabeshsingh/Khepri/wiki/Web-Portal-Guide">Management Portal</a> •
+    <a href="https://github.com/pranabeshsingh/Khepri/wiki/Architecture-and-Deployment">Architecture</a>
   </p>
 </div>
 
@@ -89,7 +89,7 @@ Khepri acts as an always-on personal companion through Telegram. You can execute
 * **Math:** *"What is 1024 * 64?"* ➔ Evaluated deterministically with 100% precision.
 * **Reminders:** *"Remind me to check server logs in 20 minutes"* ➔ Grounded target timestamp computed and scheduled automatically.
 
-> 📖 **Full Setup Instructions:** See the [Telegram Bot Setup Guide](wiki/Telegram-Bot-Setup.md).
+> 📖 **Full Setup Instructions:** See the [Telegram Bot Setup Guide](https://github.com/pranabeshsingh/Khepri/wiki/Telegram-Bot-Setup).
 
 ---
 
@@ -180,11 +180,11 @@ ruff check pithon tests
 
 ## Documentation & Wiki
 
-Explore the complete documentation in the [Wiki](wiki/Home.md):
-* [Telegram Bot Setup Guide](wiki/Telegram-Bot-Setup.md)
-* [Bot Commands & Tool Calling Reference](wiki/Bot-Commands-and-Tools.md)
-* [Management Portal Guide](wiki/Web-Portal-Guide.md)
-* [Architecture & Edge Deployment](wiki/Architecture-and-Deployment.md)
+Explore the complete documentation in the [Wiki](https://github.com/pranabeshsingh/Khepri/wiki):
+* [Telegram Bot Setup Guide](https://github.com/pranabeshsingh/Khepri/wiki/Telegram-Bot-Setup)
+* [Bot Commands & Tool Calling Reference](https://github.com/pranabeshsingh/Khepri/wiki/Bot-Commands-and-Tools)
+* [Management Portal Guide](https://github.com/pranabeshsingh/Khepri/wiki/Web-Portal-Guide)
+* [Architecture & Edge Deployment](https://github.com/pranabeshsingh/Khepri/wiki/Architecture-and-Deployment)
 
 ---
 
