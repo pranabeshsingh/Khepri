@@ -68,3 +68,38 @@ def test_login_flow_and_api(web_server, temp_storage):
         data = json.loads(resp.read().decode("utf-8"))
         assert "status" in data
         assert data["status"] == "ok"
+
+
+def test_web_api_calendar(web_server, temp_storage):
+    good_login = urllib.request.Request(
+        f"{web_server}/api/login",
+        data=json.dumps({"password": "test-password-123"}).encode("utf-8"),
+        headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(good_login) as resp:
+        cookie_header = resp.headers.get("Set-Cookie", "")
+        token = cookie_header.split("pithon_session=")[1].split(";")[0]
+
+    temp_storage.save_calendar_events("web", [{
+        "id": "web-event-1",
+        "parent_uid": "web-event-1",
+        "title": "Design Sprint",
+        "description": "",
+        "location": "Meet",
+        "meeting_link": "https://meet.google.com/web",
+        "start_time": "2026-10-13T15:00:00+05:30",
+        "end_time": "2026-10-13T16:00:00+05:30",
+        "is_recurring": 0,
+        "event_md5": "md5-web"
+    }])
+
+    api_req = urllib.request.Request(
+        f"{web_server}/api/calendar",
+        headers={"Cookie": f"pithon_session={token}"}
+    )
+    with urllib.request.urlopen(api_req) as resp:
+        assert resp.status == 200
+        data = json.loads(resp.read().decode("utf-8"))
+        assert data["status"] == "ok"
+        assert "events" in data
+        assert any(e["title"] == "Design Sprint" for e in data["events"])

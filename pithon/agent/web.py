@@ -15,6 +15,9 @@ from pithon.agent.search import should_search, search_duckduckgo, format_search_
 from pithon.agent.time_context import format_temporal_prompt_header
 from pithon.presets import get_preset_system_prompt
 from pithon.agent.memory import list_notes, get_note_content, save_note, delete_note
+from pithon.agent.calendar import fetch_and_parse_calendar
+from datetime import datetime, timezone
+import zoneinfo, os
 from pithon.agent.calc import safe_calculate
 from pithon.agent.weather import get_weather_report, is_weather_intent, extract_weather_location
 from pithon.agent.tools import extract_tool_call, execute_tool_call
@@ -1210,6 +1213,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
         <!-- QUICK PROMPT PILLS -->
         <div class="chat-suggestions">
           <span class="pill-prompt" onclick="setPrompt('/briefing')">📰 Daily Briefing (/briefing)</span>
+          <span class="pill-prompt" onclick="setPrompt('/calendar')">📅 Today's Agenda (/calendar)</span>
           <span class="pill-prompt" onclick="setPrompt('How is the weather in Kolkata today?')">🌤️ Weather in Kolkata</span>
           <span class="pill-prompt" onclick="setPrompt('Calculate 25 * 18.5 + 40')">🧮 Safe calculate</span>
           <span class="pill-prompt" onclick="setPrompt('/timer 15m Pasta')">⏱️ Set 15m timer</span>
@@ -2042,6 +2046,20 @@ def create_web_server(
                     "telemetry": telemetry
                 })
 
+            elif path == "/api/calendar":
+                prof = (storage.get_user_profile("web") if storage else {}) or {}
+                cal_url = prof.get("calendar_url") or os.environ.get("CALENDAR_ICS_URL", "")
+                alert_mins = prof.get("calendar_alert_mins") or 10
+                synced_at = prof.get("calendar_synced_at") or ""
+                events = storage.get_upcoming_events("web", limit=20) if storage else []
+                self._send_json({
+                    "status": "ok",
+                    "url": cal_url,
+                    "alert_mins": alert_mins,
+                    "synced_at": synced_at,
+                    "events": events
+                })
+
             elif path == "/api/briefing":
                 from pithon.agent.briefing import generate_daily_briefing
                 briefing_text = generate_daily_briefing(str(admin_id or "web"), storage, tz_name=tz_name)
@@ -2169,6 +2187,18 @@ def create_web_server(
                 else:
                     self._send_json({"error": "Filename required"}, status=400)
 
+            elif path == "/api/calendar/sync":
+                prof = (storage.get_user_profile("web") if storage else {}) or {}
+                cal_url = prof.get("calendar_url") or os.environ.get("CALENDAR_ICS_URL", "")
+                if not cal_url:
+                    self._send_json({"error": "No calendar URL configured"}, status=400)
+                    return
+                changed, feed_md5, events = fetch_and_parse_calendar(cal_url, "", tz_name)
+                if storage:
+                    storage.save_calendar_events("web", events)
+                    storage.update_calendar_settings("web", feed_md5=feed_md5)
+                self._send_json({"status": "ok", "synced": len(events), "feed_md5": feed_md5})
+
             elif path == "/api/chat/clear":
                 if storage:
                     storage.clear_context(str(admin_id or "web"))
@@ -2201,6 +2231,34 @@ def create_web_server(
                 if not reply_text and (prompt.startswith("/briefing") or prompt.lower().strip() in ("/briefing", "daily briefing", "briefing")):
                     from pithon.agent.briefing import generate_daily_briefing
                     reply_text = generate_daily_briefing(str(admin_id or "web"), storage, tz_name=tz_name)
+
+                # 0c. Check /calendar command
+                if not reply_text and (prompt.startswith("/calendar") or prompt.startswith("/agenda") or prompt.lower().strip() in ("/calendar", "my calendar", "today's agenda", "agenda")):
+                    prof = (storage.get_user_profile("web") if storage else {}) or {}
+                    cal_url = prof.get("calendar_url") or os.environ.get("CALENDAR_ICS_URL", "")
+                    events = storage.get_upcoming_events("web", limit=6) if storage else []
+                    if events:
+                        lines = ["📅 **Upcoming Calendar Meetings & Calls:**\n"]
+                        try:
+                            tz = zoneinfo.ZoneInfo(tz_name)
+                        except Exception:
+                            tz = timezone.utc
+                        for ev in events:
+                            try:
+                                ev_start = datetime.fromisoformat(ev["start_time"]).astimezone(tz)
+                                ev_end = datetime.fromisoformat(ev["end_time"]).astimezone(tz)
+                                t_str = f"{ev_start.strftime('%a %d %b, %I:%M %p')} - {ev_end.strftime('%I:%M %p')}"
+                                loc = f" *({ev['location']})*" if ev.get("location") else ""
+                                if ev.get("meeting_link"):
+                                    lines.append(f"• `{t_str}`\n  [{ev['title']}]({ev['meeting_link']}){loc}")
+                                else:
+                                    lines.append(f"• `{t_str}`\n  **{ev['title']}**{loc}")
+                            except Exception:
+                                continue
+                        reply_text = "\n".join(lines)
+                    else:
+                        reply_text = "📅 No upcoming meetings found in calendar. Use `/calendar set <url>` in Telegram or configure CALENDAR_ICS_URL to connect your feed."
+
 
                 # 1. Check direct weather intent
                 if not reply_text and is_weather_intent(prompt):
