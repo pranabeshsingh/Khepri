@@ -72,3 +72,78 @@ def test_hourly_digest_tick(temp_storage, mock_bot):
     # Verify saved in storage
     digests = temp_storage.get_digests()
     assert len(digests) == 1
+
+
+def test_calendar_alerts_tick(temp_storage, mock_bot):
+    admin_id = "admin_1"
+    scheduler = Scheduler(
+        bot=mock_bot,
+        storage=temp_storage,
+        admin_chat_id=admin_id,
+        tz_name="Asia/Kolkata"
+    )
+    temp_storage.save_user_profile(admin_id, name="Pranabesh")
+    temp_storage.update_calendar_settings(admin_id, url="https://example.com/cal.ics", alert_mins=10, feed_md5="")
+
+    now = datetime.now(timezone.utc)
+    start = (now + timedelta(minutes=5)).isoformat()
+    end = (now + timedelta(minutes=35)).isoformat()
+    temp_storage.save_calendar_events(admin_id, [{
+        "id": "event-1",
+        "parent_uid": "event-1",
+        "title": "Live Call",
+        "description": "Join https://meet.google.com/xyz",
+        "location": "Google Meet",
+        "meeting_link": "https://meet.google.com/xyz",
+        "start_time": start,
+        "end_time": end,
+        "is_recurring": 0,
+        "event_md5": "md5-1"
+    }])
+
+    dispatched = scheduler.calendar_alerts_tick()
+    assert dispatched == 1
+    mock_bot.send_message.assert_called_once()
+    args, kwargs = mock_bot.send_message.call_args
+    assert str(args[0]) == admin_id
+    assert "Live Call" in args[1]
+    assert kwargs.get("disable_web_page_preview") is True
+    buttons = kwargs["reply_markup"]["inline_keyboard"][0]
+    assert any(b.get("url") == "https://meet.google.com/xyz" for b in buttons)
+
+    mock_bot.send_message.reset_mock()
+    dispatched_again = scheduler.calendar_alerts_tick()
+    assert dispatched_again == 0
+    mock_bot.send_message.assert_not_called()
+
+def test_calendar_sync_tick(temp_storage, mock_bot):
+    admin_id = "admin_1"
+    scheduler = Scheduler(
+        bot=mock_bot,
+        storage=temp_storage,
+        admin_chat_id=admin_id,
+        tz_name="Asia/Kolkata"
+    )
+    temp_storage.update_calendar_settings(admin_id, url="https://example.com/cal.ics", alert_mins=10, feed_md5="")
+
+    sample_events = [{
+        "id": "synced-1",
+        "parent_uid": "synced-1",
+        "title": "Synced Standup",
+        "description": "",
+        "location": "",
+        "meeting_link": "",
+        "start_time": datetime.now(timezone.utc) + timedelta(hours=1),
+        "end_time": datetime.now(timezone.utc) + timedelta(hours=2),
+        "is_recurring": 0,
+        "event_md5": "md5-synced"
+    }]
+
+    with patch("pithon.agent.scheduler.fetch_and_parse_calendar", return_value=(True, "new_feed_md5", sample_events)):
+        synced = scheduler.calendar_sync_tick()
+        assert synced == 1
+        prof = temp_storage.get_user_profile(admin_id)
+        assert prof["calendar_feed_md5"] == "new_feed_md5"
+        upcoming = temp_storage.get_upcoming_events(admin_id)
+        assert len(upcoming) == 1
+        assert upcoming[0]["title"] == "Synced Standup"

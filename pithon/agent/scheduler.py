@@ -7,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 import zoneinfo
 from typing import Any, Optional
 
+import os
+from pithon.agent.calendar import fetch_and_parse_calendar
 from pithon.agent.tasks import format_reminder_alert
 
 logger = logging.getLogger("pithon.scheduler")
@@ -155,13 +157,98 @@ class Scheduler:
                 logger.error(f"Failed to send scheduled daily briefing: {e}")
         return briefing
 
+    def calendar_sync_tick(self, force: bool = False) -> int:
+        """Periodically sync remote ICS calendar feed with MD5 change detection."""
+        if not self.storage or not self.admin_chat_id:
+            return 0
+
+        prof = self.storage.get_user_profile(self.admin_chat_id) or {}
+        cal_url = prof.get("calendar_url") or os.environ.get("CALENDAR_ICS_URL", "")
+        if not cal_url:
+            return 0
+
+        current_feed_md5 = prof.get("calendar_feed_md5") or ""
+        changed, feed_md5, events = fetch_and_parse_calendar(cal_url, current_feed_md5, self.tz_name)
+
+        if changed or force:
+            self.storage.save_calendar_events(self.admin_chat_id, events)
+            self.storage.update_calendar_settings(self.admin_chat_id, feed_md5=feed_md5)
+            logger.info(f"Synchronized calendar: {len(events)} events (MD5 {feed_md5[:8]})")
+
+        self.storage.prune_old_calendar_events(days=7)
+        return len(events) if (changed or force) else 0
+
+    def calendar_alerts_tick(self) -> int:
+        """Check for upcoming meetings starting within alert_mins window and send proactive notifications."""
+        if not self.storage or not self.bot or not self.admin_chat_id:
+            return 0
+
+        prof = self.storage.get_user_profile(self.admin_chat_id) or {}
+        alert_mins = int(prof.get("calendar_alert_mins") or 10)
+
+        now = datetime.now(timezone.utc)
+        start_iso = now.isoformat()
+        end_iso = (now + timedelta(minutes=alert_mins, seconds=30)).isoformat()
+
+        unreminded = self.storage.get_unreminded_events_in_range(self.admin_chat_id, start_iso, end_iso)
+        dispatched = 0
+
+        for ev in unreminded:
+            try:
+                ev_start = datetime.fromisoformat(ev["start_time"])
+                ev_end = datetime.fromisoformat(ev["end_time"])
+                tz = self._get_tz()
+                local_start = ev_start.astimezone(tz)
+                local_end = ev_end.astimezone(tz)
+                time_str = f"{local_start.strftime('%I:%M %p')} - {local_end.strftime('%I:%M %p')}"
+                mins_until = max(1, int((ev_start - now).total_seconds() / 60))
+
+                title = ev.get("title", "Upcoming Meeting")
+                location = ev.get("location") or "Online Meeting"
+                link = ev.get("meeting_link")
+
+                min_label = f"{mins_until} mins" if mins_until > 1 else "1 min"
+                msg_text = (
+                    f"🔔 *Upcoming Call in {min_label}!*\n\n"
+                    f"📌 *{title}*\n"
+                    f"🕒 `{time_str}`\n"
+                    f"📍 _{location}_"
+                )
+                row = []
+                if link:
+                    row.append({"text": "📞 Join Meeting", "url": link})
+                row.append({"text": "✅ Acknowledged", "callback_data": f"cal_dismiss:{ev['id']}"})
+                reply_markup = {"inline_keyboard": [row]}
+
+                self.bot.send_message(
+                    self.admin_chat_id,
+                    msg_text,
+                    reply_markup=reply_markup,
+                    disable_web_page_preview=True
+                )
+                self.storage.mark_event_reminded(ev["id"])
+                dispatched += 1
+            except Exception as e:
+                logger.error(f"Failed to dispatch calendar alert for event {ev.get('id')}: {e}")
+
+        return dispatched
+
     def _loop(self) -> None:
         last_hour = -1
         last_briefing_date = None
+        last_sync_epoch = 0.0
         while self._running:
             try:
-                # 1. Minute tick for reminders
+                now_epoch = time.time()
+
+                # 0. Calendar sync every 300 seconds (5 minutes)
+                if now_epoch - last_sync_epoch >= 300.0:
+                    last_sync_epoch = now_epoch
+                    self.calendar_sync_tick()
+
+                # 1. Minute tick for tasks and proactive meeting alerts
                 self.check_reminders_tick()
+                self.calendar_alerts_tick()
 
                 current_time = datetime.now(self._get_tz())
 
