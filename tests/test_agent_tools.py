@@ -164,3 +164,25 @@ def test_execute_tool_call_list_tasks(tmp_path):
     assert "Fix bike" in reply
     assert markup is not None
     assert len(markup["inline_keyboard"]) == 2
+
+
+def test_get_calendar_events_tool(tmp_path):
+    db_file = str(tmp_path / "test.db")
+    storage = Storage(db_file)
+    storage.save_user_profile("user_1", name="Pranabesh")
+    storage.save_calendar_events("user_1", [{
+        "id": "e-1",
+        "parent_uid": "e-1",
+        "title": "Daily Sync",
+        "description": "",
+        "location": "Meet",
+        "meeting_link": "https://meet.google.com/xyz",
+        "start_time": "2026-10-13T10:00:00+05:30",
+        "end_time": "2026-10-13T10:30:00+05:30",
+        "is_recurring": 0,
+        "event_md5": "md5"
+    }])
+    tool_call = {"name": "get_calendar_events", "arguments": {"days": 1}}
+    reply, markup, ctx = execute_tool_call(tool_call, storage, "user_1", tz_name="Asia/Kolkata")
+    assert "Daily Sync" in reply
+    assert ctx["type"] == "calendar"

@@ -19,6 +19,22 @@ TOOLS_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "get_calendar_events",
+            "description": "Get upcoming calendar meetings, schedule, and video call links.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "days": {
+                        "type": "integer",
+                        "description": "Number of days ahead to look for meetings (default 1 for today)."
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "set_timer",
             "description": "Start countdown timer or alarm that alerts user after duration",
             "parameters": {
@@ -317,6 +333,49 @@ def execute_tool_call(
         reply_markup = {"inline_keyboard": [url_buttons]} if url_buttons else None
         context_block = format_search_context(results, query)
         return "", reply_markup, {"type": "search", "query": query, "results": results, "context": context_block}
+
+    elif name == "get_calendar_events":
+        if not storage:
+            return "No storage available to retrieve calendar.", None, {"type": "calendar"}
+        days = int(args.get("days", 1)) if isinstance(args, dict) else 1
+        try:
+            tz = zoneinfo.ZoneInfo(tz_name)
+        except Exception:
+            tz = zoneinfo.ZoneInfo("Asia/Kolkata")
+        now = datetime.now(tz)
+        today_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_utc = today_midnight.astimezone(zoneinfo.ZoneInfo("UTC")).isoformat()
+        events = storage.get_upcoming_events(chat_id, limit=15, start_after=start_utc)
+        if not events and chat_id != "web":
+            events = storage.get_upcoming_events("web", limit=15, start_after=start_utc)
+
+        max_dt = today_midnight + timedelta(days=days, hours=23, minutes=59)
+        matching = []
+        for ev in events:
+            try:
+                ev_start = datetime.fromisoformat(ev["start_time"]).astimezone(tz)
+                if ev_start <= max_dt:
+                    matching.append((ev_start, ev))
+            except Exception:
+                continue
+
+        if not matching:
+            period = "today" if days == 1 else f"the next {days} days"
+            return f"📅 No meetings scheduled for {period} ✨", None, {"type": "calendar"}
+
+        lines = [f"📅 *Upcoming Meetings ({len(matching)} found):*"]
+        for ev_start, ev in matching:
+            ev_end = datetime.fromisoformat(ev["end_time"]).astimezone(tz)
+            date_prefix = f"{ev_start.strftime('%a %d %b')} " if days > 1 else ""
+            t_str = f"{date_prefix}{ev_start.strftime('%I:%M %p')} - {ev_end.strftime('%I:%M %p')}"
+            link = ev.get("meeting_link")
+            loc = f" _({ev['location']})_" if ev.get("location") else ""
+            if link:
+                lines.append(f"• `{t_str}` — [{ev['title']}]({link}){loc}")
+            else:
+                lines.append(f"• `{t_str}` — *{ev['title']}*{loc}")
+
+        return "\n".join(lines), None, {"type": "calendar"}
 
     elif name == "get_daily_briefing":
         from pithon.agent.briefing import generate_daily_briefing

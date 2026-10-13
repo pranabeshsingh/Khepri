@@ -225,3 +225,61 @@ def test_command_task_and_note_and_search(bot, mock_storage, tmp_path):
         mock_ddg.assert_called_once_with("python async", max_results=3)
         mock_send.assert_called_once()
         assert "Python Async" in mock_send.call_args[0][1]
+
+
+def test_command_calendar(bot, mock_storage):
+    admin_id = "123456789"
+    mock_storage.save_user_profile(admin_id, name="Pranabesh")
+    mock_storage.update_calendar_settings(admin_id, url="https://example.com/cal.ics", alert_mins=10)
+
+    # 1. /calendar view
+    msg_cal = {
+        "message_id": 60,
+        "chat": {"id": 123456789},
+        "from": {"id": 123456789},
+        "text": "/calendar"
+    }
+    with patch.object(bot, "send_message") as mock_send:
+        bot.handle_message(msg_cal)
+        mock_send.assert_called_once()
+        assert "Calendar" in mock_send.call_args[0][1]
+
+    # 2. /calendar set <url>
+    msg_set = {
+        "message_id": 61,
+        "chat": {"id": 123456789},
+        "from": {"id": 123456789},
+        "text": "/calendar set https://test.com/events.ics"
+    }
+    with patch("pithon.agent.telegram_bot.fetch_and_parse_calendar", return_value=(True, "md5_new", [])) as mock_sync,          patch.object(bot, "send_message") as mock_send:
+        bot.handle_message(msg_set)
+        mock_send.assert_called_once()
+        assert "configured" in mock_send.call_args[0][1].lower()
+
+    # 3. /calendar alert <mins>
+    msg_alert = {
+        "message_id": 62,
+        "chat": {"id": 123456789},
+        "from": {"id": 123456789},
+        "text": "/calendar alert 15"
+    }
+    with patch.object(bot, "send_message") as mock_send:
+        bot.handle_message(msg_alert)
+        mock_send.assert_called_once()
+        assert "15 minutes" in mock_send.call_args[0][1]
+
+    # 4. Callback cal_dismiss
+    cb_dismiss = {
+        "id": "cb_cal",
+        "from": {"id": 123456789},
+        "message": {
+            "message_id": 63,
+            "chat": {"id": 123456789},
+            "text": "Meeting reminder"
+        },
+        "data": "cal_dismiss:event_1"
+    }
+    with patch.object(bot, "answer_callback_query") as mock_ans,          patch.object(bot, "edit_message_text") as mock_edit:
+        bot.handle_callback_query(cb_dismiss)
+        mock_ans.assert_called_once_with("cb_cal", text="Meeting reminder acknowledged! ✅")
+        mock_edit.assert_called_once()

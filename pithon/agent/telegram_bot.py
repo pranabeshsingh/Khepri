@@ -19,6 +19,7 @@ from pithon.agent.calc import safe_calculate
 from pithon.agent.weather import get_weather_report, is_weather_intent, extract_weather_location
 from pithon.agent.memory import list_notes, save_note
 from pithon.agent.briefing import generate_daily_briefing
+from pithon.agent.calendar import fetch_and_parse_calendar
 from pithon.agent.profile import (
     start_onboarding,
     handle_onboarding_step,
@@ -153,6 +154,14 @@ class TelegramBot:
             updated_text = f"~~{current_text}~~\n\n✅ *Marked completed!*"
             self.edit_message_text(chat_id, msg_id, updated_text, reply_markup={"inline_keyboard": []})
 
+        elif data.startswith("cal_dismiss:"):
+            ev_id = data.split(":", 1)[1]
+            if self.storage:
+                self.storage.mark_event_reminded(ev_id)
+            self.answer_callback_query(cb_id, text="Meeting reminder acknowledged! ✅")
+            updated_text = f"{current_text}\n\n_✅ Acknowledged_"
+            self.edit_message_text(chat_id, msg_id, updated_text, reply_markup={"inline_keyboard": []})
+
         elif data.startswith("snooze:"):
             tid = int(data.split(":")[1])
             if self.storage:
@@ -234,12 +243,97 @@ class TelegramBot:
                     self.send_message(chat_id, step_reply)
                     return
 
+        # Fast-path /calendar and /agenda
+        if text.startswith("/calendar") or text.startswith("/agenda"):
+            parts = text.split()
+            cmd_arg = parts[1].lower() if len(parts) > 1 else ""
+
+            if cmd_arg == "set" and len(parts) > 2:
+                cal_url = parts[2].strip()
+                if not (cal_url.startswith("http://") or cal_url.startswith("https://") or cal_url.startswith("webcal://")):
+                    self.send_message(chat_id, "⚠️ Invalid URL. Must begin with `https://`, `http://`, or `webcal://`.")
+                    return
+                if self.storage:
+                    self.storage.update_calendar_settings(str(chat_id), url=cal_url)
+                # Immediate initial sync
+                changed, feed_md5, events = fetch_and_parse_calendar(cal_url, "", self.tz_name)
+                if self.storage:
+                    self.storage.save_calendar_events(str(chat_id), events)
+                    self.storage.update_calendar_settings(str(chat_id), feed_md5=feed_md5)
+                reply = (
+                    f"✅ *Calendar URL configured and synced!*\n\n"
+                    f"🔗 *Feed URL:* `{cal_url}`\n"
+                    f"📥 *Meetings parsed:* `{len(events)}` upcoming events found."
+                )
+                self.send_message(chat_id, reply, disable_web_page_preview=True)
+                return
+
+            elif cmd_arg == "alert" and len(parts) > 2:
+                try:
+                    mins = int(parts[2].strip())
+                    if mins < 1 or mins > 120:
+                        raise ValueError()
+                except ValueError:
+                    self.send_message(chat_id, "⚠️ Please specify alert minutes between 1 and 120 (e.g. `/calendar alert 15`).")
+                    return
+                if self.storage:
+                    self.storage.update_calendar_settings(str(chat_id), alert_mins=mins)
+                self.send_message(chat_id, f"✅ *Meeting alert lead time updated to {mins} minutes before call.*")
+                return
+
+            elif cmd_arg == "sync":
+                prof = self.storage.get_user_profile(str(chat_id)) if self.storage else {}
+                cal_url = prof.get("calendar_url") or os.environ.get("CALENDAR_ICS_URL", "")
+                if not cal_url:
+                    self.send_message(chat_id, "⚠️ No calendar URL configured yet. Use `/calendar set <url>` to configure.")
+                    return
+                changed, feed_md5, events = fetch_and_parse_calendar(cal_url, "", self.tz_name)
+                if self.storage:
+                    self.storage.save_calendar_events(str(chat_id), events)
+                    self.storage.update_calendar_settings(str(chat_id), feed_md5=feed_md5)
+                self.send_message(chat_id, f"🔄 *Calendar synced!* Found `{len(events)}` upcoming meetings.")
+                return
+
+            # Default: list upcoming meetings and settings
+            prof = self.storage.get_user_profile(str(chat_id)) if self.storage else {}
+            cal_url = prof.get("calendar_url") or os.environ.get("CALENDAR_ICS_URL", "")
+            alert_mins = prof.get("calendar_alert_mins") or 10
+
+            upcoming = self.storage.get_upcoming_events(str(chat_id), limit=6) if self.storage else []
+            lines = ["📅 *Upcoming Calendar Meetings & Calls:*\n"]
+            if upcoming:
+                try:
+                    tz = zoneinfo.ZoneInfo(self.tz_name)
+                except Exception:
+                    tz = timezone.utc
+                for ev in upcoming:
+                    try:
+                        ev_start = datetime.fromisoformat(ev["start_time"]).astimezone(tz)
+                        ev_end = datetime.fromisoformat(ev["end_time"]).astimezone(tz)
+                        t_str = f"{ev_start.strftime('%a %d %b, %I:%M %p')} - {ev_end.strftime('%I:%M %p')}"
+                        loc_str = f" _({ev['location']})_" if ev.get("location") else ""
+                        link = ev.get("meeting_link")
+                        if link:
+                            lines.append(f"• `{t_str}`\n  [{ev['title']}]({link}){loc_str}")
+                        else:
+                            lines.append(f"• `{t_str}`\n  *{ev['title']}*{loc_str}")
+                    except Exception:
+                        continue
+            else:
+                lines.append("• No upcoming meetings found in calendar.")
+
+            url_display = cal_url if cal_url else "Not configured (use /calendar set <url>)"
+            lines.append(f"\n⚙️ *Settings:*\n• *Sync Feed:* `{url_display}`\n• *Alert Lead Time:* `{alert_mins} mins`")
+            self.send_message(chat_id, "\n".join(lines), disable_web_page_preview=True)
+            return
+
         if text.startswith("/start") or text.startswith("/help"):
             help_text = (
                 "👋 *Welcome to Khepri Assistant!*\n\n"
                 "I am your lightweight personal AI agent, grounded with live time, task management, and web search.\n\n"
                 "*Available Commands:*\n"
                 "• `/briefing` - Personalized daily briefing (weather, top 10 news, facts, thought)\n"
+                "• `/calendar` - View upcoming calls & configure ICS feed URL (/calendar set <url>)\n"
                 "• `/init` - Onboarding profile wizard (name, location, preferences)\n"
                 "• `/clear` or `/reset` - Clear conversational dialogue turns\n"
                 "• `/time` - Current date, time, and timezone\n"
