@@ -90,6 +90,40 @@ def generate_daily_briefing(
     except Exception as e:
         logger.warning(f"Failed to fetch weather for briefing: {e}")
 
+    # 3. Today's Agenda & Calls (Calendar Events)
+    if storage:
+        try:
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            today_start_utc = today_start.astimezone(zoneinfo.ZoneInfo("UTC")).isoformat()
+            upcoming_cal = storage.get_upcoming_events(str(chat_id), limit=10, start_after=today_start_utc)
+            if not upcoming_cal and chat_id != "web":
+                upcoming_cal = storage.get_upcoming_events("web", limit=10, start_after=today_start_utc)
+
+            today_events = []
+            for ev in upcoming_cal:
+                try:
+                    ev_dt = datetime.fromisoformat(ev["start_time"]).astimezone(tz)
+                    if ev_dt.date() == now.date():
+                        today_events.append((ev_dt, ev))
+                except Exception:
+                    continue
+
+            if today_events:
+                cal_lines = [f"📅 *Today's Agenda & Calls ({len(today_events)} scheduled):*"]
+                for ev_dt, ev in today_events:
+                    ev_end = datetime.fromisoformat(ev["end_time"]).astimezone(tz)
+                    time_range = f"{ev_dt.strftime('%I:%M %p')} - {ev_end.strftime('%I:%M %p')}"
+                    loc_str = f" _({ev['location']})_" if ev.get("location") else ""
+                    if ev.get("meeting_link"):
+                        cal_lines.append(f"• `{time_range}` — [{ev['title']}]({ev['meeting_link']}){loc_str}")
+                    else:
+                        cal_lines.append(f"• `{time_range}` — *{ev['title']}*{loc_str}")
+                sections.append("\n".join(cal_lines))
+            else:
+                sections.append("📅 *Today's Agenda:\n• No calls scheduled for today ✨*")
+        except Exception as e:
+            logger.warning(f"Failed to fetch calendar for briefing: {e}")
+
     # 3. Active Tasks / Reminders
     if storage:
         try:

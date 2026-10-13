@@ -95,3 +95,30 @@ def test_execute_tool_call_briefing(tmp_path):
 
         assert "Bengaluru Metro Extension" in reply
         assert ctx["type"] == "briefing"
+
+
+def test_briefing_includes_agenda(tmp_path):
+    import zoneinfo
+    db_path = str(tmp_path / "test_pithon.db")
+    storage = Storage(db_path)
+    storage.save_user_profile("user_1", name="Pranabesh")
+    now_local = datetime.now(zoneinfo.ZoneInfo("Asia/Kolkata"))
+    start_iso = now_local.replace(hour=14, minute=0, second=0).isoformat()
+    end_iso = now_local.replace(hour=14, minute=30, second=0).isoformat()
+    storage.save_calendar_events("user_1", [{
+        "id": "cal-today-1",
+        "parent_uid": "cal-1",
+        "title": "Quarterly Planning",
+        "description": "",
+        "location": "Zoom",
+        "meeting_link": "https://zoom.us/j/12345",
+        "start_time": start_iso,
+        "end_time": end_iso,
+        "is_recurring": 0,
+        "event_md5": "md5-today"
+    }])
+    with patch("pithon.agent.briefing.fetch_news_headlines", return_value={"local": [], "national": [], "world": []}),          patch("pithon.agent.briefing.get_weather_report", return_value={"summary": "25C"}):
+        briefing = generate_daily_briefing("user_1", storage, tz_name="Asia/Kolkata")
+        assert "Today's Agenda & Calls" in briefing
+        assert "Quarterly Planning" in briefing
+        assert "https://zoom.us/j/12345" in briefing
