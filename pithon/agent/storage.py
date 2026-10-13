@@ -81,9 +81,43 @@ class Storage:
                 digest_pref TEXT DEFAULT '',
                 focus TEXT DEFAULT '',
                 step TEXT NULL,
+                calendar_url TEXT DEFAULT '',
+                calendar_alert_mins INTEGER DEFAULT 10,
+                calendar_feed_md5 TEXT DEFAULT '',
+                calendar_synced_at TIMESTAMP NULL,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS calendar_events (
+                id TEXT PRIMARY KEY,
+                chat_id TEXT NOT NULL,
+                parent_uid TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                location TEXT DEFAULT '',
+                meeting_link TEXT DEFAULT '',
+                start_time TIMESTAMP NOT NULL,
+                end_time TIMESTAMP NOT NULL,
+                is_recurring INTEGER DEFAULT 0,
+                event_md5 TEXT NOT NULL,
+                reminded_at TIMESTAMP NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_calendar_events_user_start ON calendar_events(chat_id, start_time);
+            CREATE INDEX IF NOT EXISTS idx_calendar_events_remind ON calendar_events(reminded_at, start_time);
             """)
+
+            # Ensure calendar migration columns exist in existing user_profiles tables
+            cols = [col["name"] for col in conn.execute("PRAGMA table_info(user_profiles);").fetchall()]
+            if "calendar_url" not in cols:
+                conn.execute("ALTER TABLE user_profiles ADD COLUMN calendar_url TEXT DEFAULT '';")
+            if "calendar_alert_mins" not in cols:
+                conn.execute("ALTER TABLE user_profiles ADD COLUMN calendar_alert_mins INTEGER DEFAULT 10;")
+            if "calendar_feed_md5" not in cols:
+                conn.execute("ALTER TABLE user_profiles ADD COLUMN calendar_feed_md5 TEXT DEFAULT '';")
+            if "calendar_synced_at" not in cols:
+                conn.execute("ALTER TABLE user_profiles ADD COLUMN calendar_synced_at TIMESTAMP NULL;")
 
     def get_table_names(self) -> List[str]:
         """Return list of existing tables."""
@@ -509,3 +543,207 @@ class Storage:
     def clear_onboarding(self, chat_id: str) -> None:
         """Clear active onboarding step."""
         self.set_onboarding_step(chat_id, None)
+
+    @staticmethod
+    def _normalize_iso_utc(ts: Any) -> str:
+        """Normalize string or datetime timestamp to UTC ISO 8601 string for consistent SQLite indexing."""
+        if isinstance(ts, str):
+            try:
+                dt = datetime.fromisoformat(ts)
+            except Exception:
+                return ts
+        elif isinstance(ts, datetime):
+            dt = ts
+        else:
+            return str(ts)
+        
+        if dt.tzinfo is not None:
+            return dt.astimezone(timezone.utc).isoformat()
+        return dt.replace(tzinfo=timezone.utc).isoformat()
+
+    def save_calendar_events(self, chat_id: str, events: List[Dict[str, Any]]) -> int:
+        """Save or update calendar events.
+        
+        Skips updating rows where event_md5 has not changed.
+        Preserves existing reminded_at state across event updates.
+        Returns count of inserted or updated rows.
+        """
+        target = str(chat_id)
+        updated_count = 0
+        with self._lock, self._get_connection() as conn:
+            for ev in events:
+                ev_id = str(ev["id"])
+                ev_md5 = str(ev.get("event_md5", ""))
+                row = conn.execute(
+                    "SELECT id, event_md5, reminded_at FROM calendar_events WHERE id = ?",
+                    (ev_id,)
+                ).fetchone()
+
+                start_iso = self._normalize_iso_utc(ev["start_time"])
+                end_iso = self._normalize_iso_utc(ev["end_time"])
+                link = ev.get("meeting_link") or ""
+
+                if row:
+                    if row["event_md5"] == ev_md5:
+                        # Unchanged: skip DB write
+                        continue
+                    conn.execute(
+                        """
+                        UPDATE calendar_events
+                        SET chat_id = ?, parent_uid = ?, title = ?, description = ?, location = ?,
+                            meeting_link = ?, start_time = ?, end_time = ?, is_recurring = ?,
+                            event_md5 = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                        """,
+                        (
+                            target,
+                            ev.get("parent_uid", ev_id),
+                            ev.get("title", "Untitled"),
+                            ev.get("description", ""),
+                            ev.get("location", ""),
+                            link,
+                            start_iso,
+                            end_iso,
+                            int(ev.get("is_recurring", 0)),
+                            ev_md5,
+                            ev_id
+                        )
+                    )
+                    updated_count += 1
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO calendar_events (
+                            id, chat_id, parent_uid, title, description, location,
+                            meeting_link, start_time, end_time, is_recurring, event_md5
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            ev_id,
+                            target,
+                            ev.get("parent_uid", ev_id),
+                            ev.get("title", "Untitled"),
+                            ev.get("description", ""),
+                            ev.get("location", ""),
+                            link,
+                            start_iso,
+                            end_iso,
+                            int(ev.get("is_recurring", 0)),
+                            ev_md5
+                        )
+                    )
+                    updated_count += 1
+
+            conn.commit()
+            return updated_count
+
+    def get_upcoming_events(
+        self,
+        chat_id: str,
+        limit: int = 5,
+        start_after: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Retrieve upcoming events for chat_id starting after start_after timestamp."""
+        target = str(chat_id)
+        if not start_after:
+            start_after_iso = datetime.now(timezone.utc).isoformat()
+        else:
+            start_after_iso = self._normalize_iso_utc(start_after)
+
+        with self._lock, self._get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM calendar_events
+                WHERE (chat_id = ? OR chat_id = 'web' OR ? = 'web')
+                  AND start_time >= ?
+                ORDER BY start_time ASC
+                LIMIT ?
+                """,
+                (target, target, start_after_iso, limit)
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_unreminded_events_in_range(
+        self,
+        chat_id: str,
+        start_iso: str,
+        end_iso: str
+    ) -> List[Dict[str, Any]]:
+        """Retrieve events in [start_iso, end_iso] that have not yet had reminders sent."""
+        target = str(chat_id)
+        start_norm = self._normalize_iso_utc(start_iso)
+        end_norm = self._normalize_iso_utc(end_iso)
+
+        with self._lock, self._get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM calendar_events
+                WHERE (chat_id = ? OR chat_id = 'web')
+                  AND reminded_at IS NULL
+                  AND start_time >= ?
+                  AND start_time <= ?
+                ORDER BY start_time ASC
+                """,
+                (target, start_norm, end_norm)
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def mark_event_reminded(self, event_id: str) -> None:
+        """Mark an event occurrence as reminded."""
+        with self._lock, self._get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE calendar_events
+                SET reminded_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (event_id,)
+            )
+            conn.commit()
+
+    def update_calendar_settings(
+        self,
+        chat_id: str,
+        url: Optional[str] = None,
+        alert_mins: Optional[int] = None,
+        feed_md5: Optional[str] = None
+    ) -> None:
+        """Update calendar ICS URL, alert lead time, or feed MD5 in user profile."""
+        target = str(chat_id)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        with self._lock, self._get_connection() as conn:
+            conn.execute("INSERT OR IGNORE INTO user_profiles (chat_id) VALUES (?)", (target,))
+            fields = []
+            vals = []
+            if url is not None:
+                fields.append("calendar_url = ?")
+                vals.append(url)
+            if alert_mins is not None:
+                fields.append("calendar_alert_mins = ?")
+                vals.append(alert_mins)
+            if feed_md5 is not None:
+                fields.append("calendar_feed_md5 = ?")
+                vals.append(feed_md5)
+                fields.append("calendar_synced_at = ?")
+                vals.append(now_iso)
+
+            if fields:
+                fields.append("updated_at = ?")
+                vals.append(now_iso)
+                query = f"UPDATE user_profiles SET {', '.join(fields)} WHERE chat_id = ?"
+                conn.execute(query, (*vals, target))
+                if target != "web":
+                    conn.execute(query, (*vals, "web"))
+            conn.commit()
+
+    def prune_old_calendar_events(self, days: int = 7) -> int:
+        """Delete events whose end_time is older than days ago to preserve DB hygiene."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        with self._lock, self._get_connection() as conn:
+            cursor = conn.execute(
+                "DELETE FROM calendar_events WHERE end_time < ?",
+                (cutoff,)
+            )
+            deleted = cursor.rowcount
+            conn.commit()
+            return deleted

@@ -105,3 +105,60 @@ def test_sessions(temp_storage):
     temp_storage.create_session(token=token, expires_in_sec=3600)
     assert temp_storage.validate_session(token) is True
     assert temp_storage.validate_session("bad-token") is False
+
+
+def test_calendar_events_storage(temp_storage):
+    events = [
+        {
+            "id": "call-1#2026-10-13T10:00:00",
+            "parent_uid": "call-1",
+            "title": "Design Review",
+            "description": "Review specs",
+            "location": "Meet",
+            "meeting_link": "https://meet.google.com/abc",
+            "start_time": "2026-10-13T10:00:00+05:30",
+            "end_time": "2026-10-13T10:30:00+05:30",
+            "is_recurring": 0,
+            "event_md5": "md5_hash_1"
+        }
+    ]
+    upserted = temp_storage.save_calendar_events("123", events)
+    assert upserted == 1
+
+    # Second call with same event_md5 should not touch rows
+    upserted_again = temp_storage.save_calendar_events("123", events)
+    assert upserted_again == 0
+
+    upcoming = temp_storage.get_upcoming_events("123", limit=5, start_after="2026-10-13T09:00:00+05:30")
+    assert len(upcoming) == 1
+    assert upcoming[0]["meeting_link"] == "https://meet.google.com/abc"
+
+    # Unreminded range query
+    unreminded = temp_storage.get_unreminded_events_in_range(
+        "123",
+        "2026-10-13T09:00:00+05:30",
+        "2026-10-13T10:15:00+05:30"
+    )
+    assert len(unreminded) == 1
+    assert unreminded[0]["id"] == "call-1#2026-10-13T10:00:00"
+
+    # Mark reminded
+    temp_storage.mark_event_reminded("call-1#2026-10-13T10:00:00")
+    unreminded_after = temp_storage.get_unreminded_events_in_range(
+        "123",
+        "2026-10-13T09:00:00+05:30",
+        "2026-10-13T10:15:00+05:30"
+    )
+    assert len(unreminded_after) == 0
+
+    # Settings update
+    temp_storage.update_calendar_settings("123", url="https://example.com/cal.ics", alert_mins=15, feed_md5="feed123")
+    prof = temp_storage.get_user_profile("123")
+    assert prof["calendar_url"] == "https://example.com/cal.ics"
+    assert prof["calendar_alert_mins"] == 15
+    assert prof["calendar_feed_md5"] == "feed123"
+
+    # Pruning old events
+    pruned = temp_storage.prune_old_calendar_events(days=0)
+    assert pruned == 1
+    assert len(temp_storage.get_upcoming_events("123", limit=5, start_after="2026-10-13T09:00:00+05:30")) == 0
