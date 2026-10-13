@@ -56,6 +56,7 @@ Registering slash commands makes them appear in the native Telegram popup menu w
 start - Open Khepri and view quick menu
 help - Show all commands and features
 briefing - Daily briefing (weather, top 10 news, facts, thought)
+calendar - View upcoming meetings and set ICS sync URL
 init - Setup personal profile and preferences
 clear - Clear conversation context memory
 init - Setup personal profile and preferences

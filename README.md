@@ -77,6 +77,7 @@ Khepri acts as an always-on personal companion through Telegram. You can execute
 | `/start` | `/start` | Open welcome greeting & quick interactive menu |
 | `/help` | `/help` | Display interactive cheat sheet |
 | `/briefing` | `/briefing` | Daily briefing: weather, top 10 news (5 local, 3 national, 2 world), milestones, quote, tasks |
+| `/calendar` | `/calendar`, `/calendar set <url>`, `/calendar alert <mins>`, `/calendar sync` | View upcoming meetings, set 5-min open ICS sync URL, configure reminder lead time |
 | `/init` | `/init` | Setup onboarding profile wizard (name, home location, digest time, focus) |
 | `/clear` | `/clear` (or `/reset`) | Clear conversation context memory turns |
 | `/time` | `/time` | Current date, time, weekday, and configured timezone |
@@ -101,6 +102,7 @@ Copy and send this directly to [@BotFather](https://t.me/BotFather) after typing
 start - Open Khepri and view quick menu
 help - Show all commands and features
 briefing - Daily briefing (weather, top 10 news, facts, thought)
+calendar - View upcoming meetings and set ICS sync URL
 init - Setup personal profile and preferences
 clear - Clear conversation context memory
 time - Current date, time, and timezone

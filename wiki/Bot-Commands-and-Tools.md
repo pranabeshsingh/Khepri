@@ -12,6 +12,7 @@ When configuring your bot in Telegram, open **[@BotFather](https://t.me/BotFathe
 start - Open Khepri and view quick menu
 help - Show all commands and features
 briefing - Daily briefing (weather, top 10 news, facts, thought)
+calendar - View upcoming meetings and set ICS sync URL
 init - Setup personal profile and preferences
 clear - Clear conversation context memory
 init - Setup personal profile and preferences
@@ -39,6 +40,7 @@ chat - Query local 0.5B AI model
 | `/start` | `/start` | Open welcome greeting & quick interactive menu | Telegram API inline keyboard |
 | `/help` | `/help` | Display interactive cheat sheet & commands | In-memory reference card |
 | `/briefing` | `/briefing` | Daily briefing: weather, top 10 news (5 local, 3 national, 2 world), milestones, quote, tasks | Aggregated RSS & storage engine |
+| `/calendar` | `/calendar [set <url> \| alert <mins> \| sync]` | View upcoming meetings, configure open ICS feed URL, adjust alert lead time | Zero-dependency RFC 5545 parser & scheduler |
 | `/init` | `/init` | Setup onboarding profile wizard (name, location, preferences) | SQLite user profile engine |
 | `/clear` | `/clear` | Clear conversation context memory turns | SQLite context reset engine |
 | `/time` | `/time` | Current date, time, weekday, and configured timezone | Python `zoneinfo` temporal grounder |
@@ -104,3 +106,15 @@ You do not need to memorize slash commands. The Khepri conversational router int
 * **Private Admin Whitelist:** Only the user matching `TELEGRAM_ADMIN_CHAT_ID` can trigger inference or view data.
 * **Unauthorized Access:** Any incoming message from unknown user IDs is silently rejected or receives an access denied notice.
 * **Silent Digest Channel (`TELEGRAM_REPORT_CHAT_ID`):** Periodic analytical summaries are pushed here. Inbound messages from channels are discarded without CPU overhead.
+
+
+### 📅 Calendar Sync & Meeting Alerts (`/calendar`)
+
+Khepri features a built-in, zero-dependency RFC 5545 iCalendar engine that continuously synchronizes with any public or open `.ics` / `webcal://` link (e.g., Google Calendar, Apple Calendar, Fastmail, Proton) every 5 minutes:
+
+* **Instant Inspection:** `/calendar` shows your next scheduled meetings with local start/end times and direct 1-click video join links (Google Meet, Zoom, Teams, Webex).
+* **Connect Feed:** `/calendar set https://calendar.google.com/calendar/ical/.../basic.ics` immediately downloads and populates the local SQLite event store.
+* **Configurable Alerts:** `/calendar alert 15` customizes how many minutes before a meeting Khepri should proactively ping you on Telegram (default is 10 minutes).
+* **Force Refresh:** `/calendar sync` manually triggers an on-demand download and parse cycle.
+* **MD5 Hashing:** Bandwidth and I/O are optimized using MD5 digests; if the calendar feed has not changed, full parsing is skipped (0ms overhead).
+* **Recurrence Support:** Standard `RRULE` specifications (`DAILY`, `WEEKLY`, `BYDAY`, `UNTIL`, `COUNT`, `EXDATE`) are expanded into a sliding window `[now - 1d, now + 14d]`.

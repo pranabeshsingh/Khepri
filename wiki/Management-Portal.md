@@ -66,3 +66,8 @@ server {
 
 ### 📰 Daily Briefings
 Trigger `/briefing` directly from the chat suggestion pills or fetch JSON from `/api/briefing`.
+
+### Calendar & Meeting API
+* `GET /api/calendar` — Returns synchronized upcoming meetings, feed URL, alert lead time, and last sync timestamp.
+* `POST /api/calendar/sync` — Forces an on-demand download and parse of the configured ICS URL.
+* Quick action pill `📅 Today's Agenda (/calendar)` available directly above the web chat input box.
