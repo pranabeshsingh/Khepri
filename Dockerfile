@@ -13,9 +13,12 @@ WORKDIR /app
 # Copy dependency requirements
 COPY pyproject.toml requirements.txt README.md ./
 
-# Install llama-cpp-python (cached layer)
+# Configure pip to prioritize official pre-built CPU wheels for llama-cpp-python
+ENV PIP_EXTRA_INDEX_URL=https://abetlen.github.io/llama-cpp-python/whl/cpu
+
+# Install llama-cpp-python (cached layer using prebuilt wheels)
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir llama-cpp-python
+    pip install --no-cache-dir --prefer-binary llama-cpp-python
 
 # Copy application code and scripts
 COPY pithon/ ./pithon/

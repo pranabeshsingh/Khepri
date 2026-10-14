@@ -229,3 +229,37 @@ class BriefingStore:
             atomic_write(filepath, briefing_text.strip() + "\n")
             logger.info(f"Saved daily briefing to {filepath}")
         return filepath
+
+    def list_briefings(self) -> List[Dict[str, Any]]:
+        """List archived daily briefing markdown files sorted newest first."""
+        items: List[Dict[str, Any]] = []
+        if not os.path.exists(self.briefings_dir):
+            return items
+        for fname in sorted(os.listdir(self.briefings_dir), reverse=True):
+            if fname.endswith(".md"):
+                fpath = os.path.join(self.briefings_dir, fname)
+                try:
+                    stat = os.stat(fpath)
+                    date_part = fname[:-3]
+                    items.append({
+                        "filename": fname,
+                        "date": date_part,
+                        "size_bytes": stat.st_size,
+                        "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
+                    })
+                except Exception:
+                    continue
+        return items
+
+    def get_briefing(self, filename_or_date: str) -> Optional[str]:
+        """Read content of a specific archived daily briefing safely."""
+        raw_name = os.path.basename(filename_or_date.strip())
+        fname = raw_name if raw_name.endswith(".md") else f"{raw_name}.md"
+        fpath = os.path.join(self.briefings_dir, fname)
+        if os.path.exists(fpath):
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    return f.read()
+            except Exception:
+                return None
+        return None

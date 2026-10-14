@@ -2,7 +2,7 @@
 
 import os
 import time
-from typing import Iterator
+from typing import Any, Iterator, Optional
 from pithon.template import detect_model_type
 
 def check_memory_headroom(min_free_mb: int = 100) -> bool:
@@ -38,7 +38,7 @@ class LlamaEngine:
         self.n_threads = max(1, min(n_threads, 4))
         self.mock_mode = mock_mode or (model_path == ":mock:")
         self.model_type = detect_model_type(model_path)
-        self.llm = None
+        self.llm: Optional[Any] = None
 
         if not self.mock_mode:
             self._load_model()

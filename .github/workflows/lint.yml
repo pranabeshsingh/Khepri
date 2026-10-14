@@ -49,10 +49,12 @@ jobs:
           python-version: "3.12"
 
       - name: Install Mypy & Dependencies
+        env:
+          PIP_EXTRA_INDEX_URL: https://abetlen.github.io/llama-cpp-python/whl/cpu
         run: |
           pip install --upgrade pip
           pip install mypy types-Pillow
-          pip install -e .
+          pip install --prefer-binary -e .
 
       - name: Run Mypy
         run: mypy pithon

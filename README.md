@@ -219,9 +219,9 @@ Khepri can also be installed as a local Python package on Raspberry Pi OS or Lin
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install llama-cpp-python and Khepri package
+# Install llama-cpp-python (using official prebuilt CPU wheels) and Khepri package
 pip install --upgrade pip
-pip install llama-cpp-python
+pip install --prefer-binary --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu llama-cpp-python
 pip install -e .
 
 # Download model

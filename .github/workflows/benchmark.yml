@@ -30,10 +30,12 @@ jobs:
           sudo apt-get install -y tesseract-ocr cmake build-essential curl
 
       - name: Install Python dependencies
+        env:
+          PIP_EXTRA_INDEX_URL: https://abetlen.github.io/llama-cpp-python/whl/cpu
         run: |
           pip install --upgrade pip
-          pip install llama-cpp-python
-          pip install -e .[dev]
+          pip install --prefer-binary llama-cpp-python
+          pip install --prefer-binary -e .[dev]
 
       - name: Download Qwen2.5-0.5B GGUF Model
         run: |
