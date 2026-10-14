@@ -13,27 +13,29 @@ logger = logging.getLogger("pithon.image")
 _OCR_ENGINE = None
 
 def get_ocr_engine():
-    """Lazily initialize RapidOCR or fallback."""
+    """Lazily initialize lightweight pytesseract or fallback."""
     global _OCR_ENGINE
     if _OCR_ENGINE is not None:
         return _OCR_ENGINE
+
+    import shutil
+    if shutil.which("tesseract"):
+        try:
+            import pytesseract
+            from PIL import Image
+            _OCR_ENGINE = "pytesseract"
+            logger.info("Initialized pytesseract edge OCR engine.")
+            return _OCR_ENGINE
+        except Exception as e:
+            logger.debug(f"pytesseract not available: {e}")
 
     try:
         from rapidocr_onnxruntime import RapidOCR
         _OCR_ENGINE = RapidOCR()
         logger.info("Initialized RapidOCR onnxruntime engine.")
         return _OCR_ENGINE
-    except Exception as e:
-        logger.warning(f"RapidOCR not available: {e}")
-
-    try:
-        import pytesseract
-        from PIL import Image
-        _OCR_ENGINE = "pytesseract"
-        logger.info("Initialized pytesseract engine.")
-        return _OCR_ENGINE
     except Exception as e2:
-        logger.warning(f"pytesseract not available: {e2}")
+        logger.debug(f"RapidOCR not available: {e2}")
 
     return None
 

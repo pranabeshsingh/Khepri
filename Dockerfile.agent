@@ -2,6 +2,11 @@ FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
+# Install lightweight system OCR binary (tesseract-ocr ~25MB)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends tesseract-ocr && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy project specification
 COPY pyproject.toml requirements.txt README.md ./
 COPY pithon/ ./pithon/
