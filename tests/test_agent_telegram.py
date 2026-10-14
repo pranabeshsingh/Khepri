@@ -1,3 +1,5 @@
+import zoneinfo
+from datetime import datetime, timedelta
 import pytest
 from unittest.mock import patch, MagicMock
 from pithon.agent.telegram_bot import TelegramBot
@@ -283,3 +285,89 @@ def test_command_calendar(bot, mock_storage):
         bot.handle_callback_query(cb_dismiss)
         mock_ans.assert_called_once_with("cb_cal", text="Meeting reminder acknowledged! ✅")
         mock_edit.assert_called_once()
+
+
+def test_command_calender_typo(bot, mock_storage):
+    admin_id = "123456789"
+    mock_storage.save_user_profile(admin_id, name="Pranabesh")
+    mock_storage.update_calendar_settings(admin_id, url="https://example.com/cal.ics", alert_mins=10)
+
+    # Typo: /calender (with an e)
+    msg = {
+        "message_id": 70,
+        "chat": {"id": 123456789},
+        "from": {"id": 123456789},
+        "text": "/calender"
+    }
+    with patch.object(bot, "send_message") as mock_send:
+        bot.handle_message(msg)
+        mock_send.assert_called_once()
+        assert "Calendar" in mock_send.call_args[0][1]
+
+def test_conversational_agenda_intent(bot, mock_storage):
+    admin_id = "123456789"
+    mock_storage.save_user_profile(admin_id, name="Pranabesh")
+    now = datetime.now(zoneinfo.ZoneInfo("Asia/Kolkata"))
+    start_time = (now + timedelta(hours=2)).isoformat()
+    end_time = (now + timedelta(hours=3)).isoformat()
+    mock_storage.save_calendar_events(admin_id, [{
+        "id": "e-call-1",
+        "parent_uid": "e-call-1",
+        "title": "Support Team Sync",
+        "description": "",
+        "location": "Zoom",
+        "meeting_link": "https://zoom.us/j/123",
+        "start_time": start_time,
+        "end_time": end_time,
+        "is_recurring": 0,
+        "event_md5": "md5-test"
+    }])
+
+    # Exact user query from conversation: 'Hi , what is In my agenda'
+    msg = {
+        "message_id": 71,
+        "chat": {"id": 123456789},
+        "from": {"id": 123456789},
+        "text": "Hi , what is In my agenda"
+    }
+    with patch.object(bot, "send_message") as mock_send:
+        bot.handle_message(msg)
+        mock_send.assert_called_once()
+        reply_text = mock_send.call_args[0][1]
+        assert "Support Team Sync" in reply_text
+        assert "https://zoom.us/j/123" in reply_text
+
+def test_model_tool_call_get_calendar_events(bot, mock_storage):
+    admin_id = "123456789"
+    mock_storage.save_user_profile(admin_id, name="Pranabesh")
+    now = datetime.now(zoneinfo.ZoneInfo("Asia/Kolkata"))
+    start_time = (now + timedelta(hours=2)).isoformat()
+    end_time = (now + timedelta(hours=3)).isoformat()
+    mock_storage.save_calendar_events(admin_id, [{
+        "id": "e-cal-2",
+        "parent_uid": "e-cal-2",
+        "title": "Architecture Review",
+        "description": "",
+        "location": "Google Meet",
+        "meeting_link": "https://meet.google.com/abc",
+        "start_time": start_time,
+        "end_time": end_time,
+        "is_recurring": 0,
+        "event_md5": "md5-cal-2"
+    }])
+
+    # Simulate Qwen outputting un-underscored JSON without XML tags
+    tool_json = '{"name": "getcalendarevents", "arguments": {"days": 1}}'
+    msg = {
+        "message_id": 72,
+        "chat": {"id": 123456789},
+        "from": {"id": 123456789},
+        "text": "Any upcoming events?"
+    }
+    with patch.object(bot, "_query_daemon", return_value=tool_json),          patch.object(bot, "send_message") as mock_send:
+        bot.handle_message(msg)
+        mock_send.assert_called_once()
+        reply = mock_send.call_args[0][1]
+        # Must execute the tool call, NOT print raw JSON!
+        assert "{" not in reply
+        assert "Architecture Review" in reply

@@ -212,8 +212,34 @@ def execute_tool_call(
     Execute tool call.
     Returns: (reply_text, reply_markup, tool_context_dict)
     """
-    name = tool_call.get("name")
+    raw_name = str(tool_call.get("name", "")).strip()
     args = tool_call.get("arguments", {})
+    if not isinstance(args, dict):
+        args = {}
+
+    norm_name = re.sub(r"[^a-z0-9]", "", raw_name.lower())
+    if norm_name in ("settimer", "timer"):
+        name = "set_timer"
+    elif norm_name in ("addtask", "task", "addtodo", "todo"):
+        name = "add_task"
+    elif norm_name in ("listtasks", "tasks", "gettasks", "todos"):
+        name = "list_tasks"
+    elif norm_name in ("getcalendarevents", "calendarevents", "calendar", "calender", "agenda", "getcalendar", "getagenda"):
+        name = "get_calendar_events"
+    elif norm_name in ("calculate", "calc", "math"):
+        name = "calculate"
+    elif norm_name in ("getweather", "weather"):
+        name = "get_weather"
+    elif norm_name in ("savenote", "note", "addnote"):
+        name = "save_note"
+    elif norm_name in ("searchnotes", "findnotes", "notes"):
+        name = "search_notes"
+    elif norm_name in ("websearch", "search", "duckduckgo"):
+        name = "web_search"
+    elif norm_name in ("getdailybriefing", "briefing", "dailybriefing"):
+        name = "get_daily_briefing"
+    else:
+        name = raw_name
 
     try:
         tz = zoneinfo.ZoneInfo(tz_name)

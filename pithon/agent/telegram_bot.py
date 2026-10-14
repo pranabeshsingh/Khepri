@@ -19,7 +19,7 @@ from pithon.agent.calc import safe_calculate
 from pithon.agent.weather import get_weather_report, is_weather_intent, extract_weather_location
 from pithon.agent.memory import list_notes, save_note
 from pithon.agent.briefing import generate_daily_briefing
-from pithon.agent.calendar import fetch_and_parse_calendar
+from pithon.agent.calendar import fetch_and_parse_calendar, is_calendar_intent
 from pithon.agent.profile import (
     start_onboarding,
     handle_onboarding_step,
@@ -244,7 +244,7 @@ class TelegramBot:
                     return
 
         # Fast-path /calendar and /agenda
-        if text.startswith("/calendar") or text.startswith("/agenda"):
+        if text.startswith(("/calendar", "/calender", "/agenda")):
             parts = text.split()
             cmd_arg = parts[1].lower() if len(parts) > 1 else ""
 
@@ -545,6 +545,25 @@ class TelegramBot:
             self.send_message(chat_id, ans)
             return
 
+        # Direct conversational calendar/agenda intent (e.g. 'what is in my agenda', 'what calls do i have today?')
+        if is_calendar_intent(text):
+            days = 2 if "tomorrow" in text.lower() else 1
+            reply_text, reply_markup, ctx = execute_tool_call(
+                {"name": "get_calendar_events", "arguments": {"days": days}},
+                self.storage,
+                str(chat_id),
+                self.tz_name
+            )
+            if self.storage:
+                self.storage.log_interaction(
+                    chat_id=str(chat_id),
+                    user_id=str(msg.get("from", {}).get("id", "")),
+                    prompt=text,
+                    response=reply_text
+                )
+            self.send_message(chat_id, reply_text, reply_markup=reply_markup, disable_web_page_preview=True)
+            return
+
         # 2. Conversational Intent via Native Qwen2.5 Tool Calling & Temporal Grounding
         tools_system = format_tools_system_prompt()
         temporal_header = format_temporal_prompt_header(self.tz_name)
@@ -582,7 +601,7 @@ class TelegramBot:
                     )
                 self.send_message(chat_id, grounded_answer, reply_markup=url_markup)
                 return
-            elif tool_name in ("set_timer", "add_task"):
+            else:
                 reply_text, reply_markup, ctx = execute_tool_call(tool_call, self.storage, str(chat_id), self.tz_name)
                 if self.storage:
                     self.storage.log_interaction(
@@ -592,7 +611,7 @@ class TelegramBot:
                         response=reply_text,
                         latency_ms=latency_ms
                     )
-                self.send_message(chat_id, reply_text, reply_markup=reply_markup)
+                self.send_message(chat_id, reply_text, reply_markup=reply_markup, disable_web_page_preview=True)
                 return
 
         # 3. Fallback: Catch conversational task/timer patterns if model didn't emit a tool call

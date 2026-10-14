@@ -528,3 +528,17 @@ def fetch_and_parse_calendar(
 
     events = parse_ics_feed(content_text, default_tz=tz_name, expand_window=expand_window)
     return True, new_feed_md5, events
+
+def is_calendar_intent(text: str) -> bool:
+    """Detect if a user prompt is asking about their calendar, agenda, calls, or meetings."""
+    if not text:
+        return False
+    t = text.lower().strip()
+    if any(k in t for k in ("agenda", "calendar", "calender")):
+        return True
+    if any(k in t for k in ("meeting", "meetings", "calls", "schedule", "appointments")) and any(
+        w in t for w in ("today", "tomorrow", "my", "upcoming", "have", "what", "next", "check", "any", "got")
+    ):
+        return True
+    return False
+

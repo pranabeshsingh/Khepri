@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+import zoneinfo
 import pytest
 from pithon.agent.tools import (
     format_tools_system_prompt,
@@ -170,6 +172,9 @@ def test_get_calendar_events_tool(tmp_path):
     db_file = str(tmp_path / "test.db")
     storage = Storage(db_file)
     storage.save_user_profile("user_1", name="Pranabesh")
+    now = datetime.now(zoneinfo.ZoneInfo("Asia/Kolkata"))
+    start_time = (now + timedelta(hours=2)).isoformat()
+    end_time = (now + timedelta(hours=3)).isoformat()
     storage.save_calendar_events("user_1", [{
         "id": "e-1",
         "parent_uid": "e-1",
@@ -177,8 +182,8 @@ def test_get_calendar_events_tool(tmp_path):
         "description": "",
         "location": "Meet",
         "meeting_link": "https://meet.google.com/xyz",
-        "start_time": "2026-10-13T10:00:00+05:30",
-        "end_time": "2026-10-13T10:30:00+05:30",
+        "start_time": start_time,
+        "end_time": end_time,
         "is_recurring": 0,
         "event_md5": "md5"
     }])
@@ -186,3 +191,35 @@ def test_get_calendar_events_tool(tmp_path):
     reply, markup, ctx = execute_tool_call(tool_call, storage, "user_1", tz_name="Asia/Kolkata")
     assert "Daily Sync" in reply
     assert ctx["type"] == "calendar"
+
+
+def test_execute_tool_call_normalized_names(tmp_path):
+    db_file = str(tmp_path / "test.db")
+    storage = Storage(db_file)
+    storage.save_user_profile("user_1", name="Pranabesh")
+    now = datetime.now(zoneinfo.ZoneInfo("Asia/Kolkata"))
+    start_time = (now + timedelta(hours=2)).isoformat()
+    end_time = (now + timedelta(hours=3)).isoformat()
+    storage.save_calendar_events("user_1", [{
+        "id": "e-1",
+        "parent_uid": "e-1",
+        "title": "Daily Scrum",
+        "description": "",
+        "location": "Teams",
+        "meeting_link": "https://teams.microsoft.com/xyz",
+        "start_time": start_time,
+        "end_time": end_time,
+        "is_recurring": 0,
+        "event_md5": "md5"
+    }])
+    # Test un-underscored Qwen output: getcalendarevents
+    call1 = {"name": "getcalendarevents", "arguments": {"days": 1}}
+    reply1, _, ctx1 = execute_tool_call(call1, storage, "user_1", tz_name="Asia/Kolkata")
+    assert "Daily Scrum" in reply1
+    assert ctx1["type"] == "calendar"
+
+    # Test short form: agenda
+    call2 = {"name": "agenda", "arguments": {}}
+    reply2, _, ctx2 = execute_tool_call(call2, storage, "user_1", tz_name="Asia/Kolkata")
+    assert "Daily Scrum" in reply2
+    assert ctx2["type"] == "calendar"

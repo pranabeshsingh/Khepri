@@ -1,3 +1,4 @@
+from datetime import datetime, timezone, timedelta
 import json
 import pytest
 import threading
@@ -80,6 +81,9 @@ def test_web_api_calendar(web_server, temp_storage):
         cookie_header = resp.headers.get("Set-Cookie", "")
         token = cookie_header.split("pithon_session=")[1].split(";")[0]
 
+    now = datetime.now(timezone.utc)
+    start_time = (now + timedelta(hours=2)).isoformat()
+    end_time = (now + timedelta(hours=3)).isoformat()
     temp_storage.save_calendar_events("web", [{
         "id": "web-event-1",
         "parent_uid": "web-event-1",
@@ -87,8 +91,8 @@ def test_web_api_calendar(web_server, temp_storage):
         "description": "",
         "location": "Meet",
         "meeting_link": "https://meet.google.com/web",
-        "start_time": "2026-10-13T15:00:00+05:30",
-        "end_time": "2026-10-13T16:00:00+05:30",
+        "start_time": start_time,
+        "end_time": end_time,
         "is_recurring": 0,
         "event_md5": "md5-web"
     }])
