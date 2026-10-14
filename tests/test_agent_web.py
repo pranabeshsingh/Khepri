@@ -1,3 +1,5 @@
+import io
+import base64
 from datetime import datetime, timezone, timedelta
 import json
 import pytest
@@ -158,3 +160,175 @@ def test_web_notes_and_chat_math(web_server, temp_storage, monkeypatch, tmp_path
     with urllib.request.urlopen(chat_req) as resp:
         chat_data = json.loads(resp.read().decode("utf-8"))
         assert "100" in chat_data.get("response", "")
+
+
+def test_web_calendar_config(web_server, temp_storage):
+    login_req = urllib.request.Request(
+        f"{web_server}/api/login",
+        data=json.dumps({"password": "test-password-123"}).encode("utf-8"),
+        headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(login_req) as resp:
+        token = resp.headers.get("Set-Cookie", "").split("pithon_session=")[1].split(";")[0]
+
+    headers = {
+        "Cookie": f"pithon_session={token}",
+        "Content-Type": "application/json"
+    }
+
+    # 1. Update calendar configuration
+    conf_req = urllib.request.Request(
+        f"{web_server}/api/calendar/config",
+        data=json.dumps({"url": "https://example.com/test_calendar.ics", "alert_mins": 15}).encode("utf-8"),
+        headers=headers
+    )
+    with urllib.request.urlopen(conf_req) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+        assert data["status"] == "ok"
+        assert data["url"] == "https://example.com/test_calendar.ics"
+        assert data["alert_mins"] == 15
+
+    # 2. Verify settings persisted via GET /api/calendar
+    get_req = urllib.request.Request(
+        f"{web_server}/api/calendar",
+        headers={"Cookie": f"pithon_session={token}"}
+    )
+    with urllib.request.urlopen(get_req) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+        assert data["url"] == "https://example.com/test_calendar.ics"
+        assert data["alert_mins"] == 15
+
+
+def test_web_profile_endpoints(web_server, temp_storage):
+    login_req = urllib.request.Request(
+        f"{web_server}/api/login",
+        data=json.dumps({"password": "test-password-123"}).encode("utf-8"),
+        headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(login_req) as resp:
+        token = resp.headers.get("Set-Cookie", "").split("pithon_session=")[1].split(";")[0]
+
+    headers = {
+        "Cookie": f"pithon_session={token}",
+        "Content-Type": "application/json"
+    }
+
+    # 1. Save Profile
+    save_req = urllib.request.Request(
+        f"{web_server}/api/profile",
+        data=json.dumps({
+            "name": "Alice",
+            "city": "Berlin",
+            "digest_pref": "Evening 8 PM",
+            "focus": "DevOps & Cloud Architecture",
+            "persona_body": "# Persona\n- Always concise and direct."
+        }).encode("utf-8"),
+        headers=headers
+    )
+    with urllib.request.urlopen(save_req) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+        assert data["status"] == "ok"
+
+    # 2. Get Profile
+    get_req = urllib.request.Request(
+        f"{web_server}/api/profile",
+        headers={"Cookie": f"pithon_session={token}"}
+    )
+    with urllib.request.urlopen(get_req) as resp:
+        prof = json.loads(resp.read().decode("utf-8"))
+        assert prof["name"] == "Alice"
+        assert prof["city"] == "Berlin"
+        assert prof["digest_pref"] == "Evening 8 PM"
+        assert prof["focus"] == "DevOps & Cloud Architecture"
+        assert "concise and direct" in prof.get("persona_body", "")
+
+
+def test_web_briefings_endpoints(web_server, temp_storage):
+    login_req = urllib.request.Request(
+        f"{web_server}/api/login",
+        data=json.dumps({"password": "test-password-123"}).encode("utf-8"),
+        headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(login_req) as resp:
+        token = resp.headers.get("Set-Cookie", "").split("pithon_session=")[1].split(";")[0]
+
+    headers = {"Cookie": f"pithon_session={token}"}
+
+    # Save a test briefing using storage.briefing_store
+    temp_storage.briefing_store.save_briefing(
+        "# Daily Briefing: Oct 14, 2026\n\nTop news and agenda.",
+        date_str="2026-10-14"
+    )
+
+    # 1. List briefings
+    list_req = urllib.request.Request(f"{web_server}/api/briefings/history", headers=headers)
+    with urllib.request.urlopen(list_req) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+        assert data["status"] == "ok"
+        assert any(b["filename"] == "2026-10-14.md" for b in data["briefings"])
+
+    # 2. Get briefing content
+    content_req = urllib.request.Request(
+        f"{web_server}/api/briefings/content?filename=2026-10-14.md",
+        headers=headers
+    )
+    with urllib.request.urlopen(content_req) as resp:
+        cdata = json.loads(resp.read().decode("utf-8"))
+        assert cdata["status"] == "ok"
+        assert "Top news and agenda" in cdata["content"]
+
+
+def test_web_image_tools(web_server):
+    login_req = urllib.request.Request(
+        f"{web_server}/api/login",
+        data=json.dumps({"password": "test-password-123"}).encode("utf-8"),
+        headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(login_req) as resp:
+        token = resp.headers.get("Set-Cookie", "").split("pithon_session=")[1].split(";")[0]
+
+    headers = {
+        "Cookie": f"pithon_session={token}",
+        "Content-Type": "application/json"
+    }
+
+    # Create dummy 20x20 in-memory image
+    from PIL import Image
+    buf = io.BytesIO()
+    im = Image.new("RGB", (20, 20), color="blue")
+    im.save(buf, format="PNG")
+    b64_img = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    # 1. Test OCR endpoint
+    ocr_req = urllib.request.Request(
+        f"{web_server}/api/tools/ocr",
+        data=json.dumps({"image": b64_img}).encode("utf-8"),
+        headers=headers
+    )
+    with urllib.request.urlopen(ocr_req) as resp:
+        odata = json.loads(resp.read().decode("utf-8"))
+        assert odata["status"] == "ok"
+
+    # 2. Test PDF compilation endpoint
+    pdf_req = urllib.request.Request(
+        f"{web_server}/api/tools/pdf",
+        data=json.dumps({"images": [b64_img]}).encode("utf-8"),
+        headers=headers
+    )
+    with urllib.request.urlopen(pdf_req) as resp:
+        pdata = json.loads(resp.read().decode("utf-8"))
+        assert pdata["status"] == "ok"
+        assert "pdf_base64" in pdata
+        assert pdata["size_bytes"] > 0
+
+    # 3. Test WebP compression endpoint
+    comp_req = urllib.request.Request(
+        f"{web_server}/api/tools/compress",
+        data=json.dumps({"image": b64_img, "quality": 75, "max_width": 1280}).encode("utf-8"),
+        headers=headers
+    )
+    with urllib.request.urlopen(comp_req) as resp:
+        cdata = json.loads(resp.read().decode("utf-8"))
+        assert cdata["status"] == "ok"
+        assert cdata["format"] == "webp"
+        assert "image_base64" in cdata

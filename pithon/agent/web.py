@@ -1,5 +1,6 @@
 """World-class dark-mode Web UI dashboard and REST API for Khepri Autonomous Agent."""
 
+import base64
 import http.cookies
 import json
 import logging
@@ -474,6 +475,234 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       padding: 0.25rem;
       border-radius: 0.65rem;
       border: 1px solid var(--border);
+      overflow-x: auto;
+      max-width: 100%;
+      white-space: nowrap;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    nav.tabs::-webkit-scrollbar { display: none; }
+
+    /* Floating Toast Notifications */
+    .toast-container {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      pointer-events: none;
+    }
+    .toast {
+      pointer-events: auto;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 0.65rem;
+      padding: 0.75rem 1.25rem;
+      font-size: 0.85rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      animation: toastIn 0.25s ease-out;
+      transition: all 0.25s ease;
+    }
+    .toast.success { border-color: rgba(16, 185, 129, 0.4); }
+    .toast.error { border-color: rgba(239, 68, 68, 0.4); }
+    .toast.info { border-color: rgba(99, 102, 241, 0.4); }
+    @keyframes toastIn { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    /* Calendar Hero & Timeline */
+    .cal-hero {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%);
+      border: 1px solid rgba(99, 102, 241, 0.35);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .cal-hero-info h3 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 0.35rem;
+    }
+    .cal-hero-meta {
+      font-size: 0.88rem;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .cal-hero-countdown {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #67e8f9;
+      background: rgba(6, 182, 212, 0.15);
+      padding: 0.2rem 0.6rem;
+      border-radius: 0.4rem;
+      border: 1px solid rgba(6, 182, 212, 0.3);
+    }
+    .cal-join-btn {
+      background: linear-gradient(135deg, #06b6d4, #3b82f6);
+      color: #fff;
+      text-decoration: none;
+      padding: 0.85rem 1.6rem;
+      border-radius: 0.65rem;
+      font-weight: 700;
+      font-size: 0.92rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 15px rgba(6, 182, 212, 0.35);
+    }
+    .cal-join-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(6, 182, 212, 0.5);
+    }
+    .cal-timeline-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 0.5rem;
+    }
+    .cal-event-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      transition: all 0.2s ease;
+    }
+    .cal-event-card:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+      background: var(--card-hover);
+      transform: translateX(4px);
+    }
+    .cal-event-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: #a5b4fc;
+      background: rgba(99, 102, 241, 0.12);
+      padding: 0.3rem 0.6rem;
+      border-radius: 0.4rem;
+      white-space: nowrap;
+    }
+    .cal-event-details { flex: 1; }
+    .cal-event-title { font-size: 0.95rem; font-weight: 700; color: #fff; }
+    .cal-event-sub { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+    /* Vision & Tools Studio */
+    .tool-dropzone {
+      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 0.85rem;
+      padding: 2rem 1.25rem;
+      text-align: center;
+      background: rgba(15, 23, 42, 0.4);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    .tool-dropzone:hover, .tool-dropzone.dragover {
+      border-color: var(--accent);
+      background: rgba(6, 182, 212, 0.08);
+    }
+    .tool-dropzone-icon { font-size: 2.2rem; color: var(--accent); }
+    .tool-thumb-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      gap: 0.65rem;
+      margin-top: 0.75rem;
+    }
+    .tool-thumb {
+      position: relative;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      aspect-ratio: 1;
+      border: 1px solid var(--border);
+    }
+    .tool-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .tool-thumb-remove {
+      position: absolute;
+      top: 3px;
+      right: 3px;
+      background: rgba(0, 0, 0, 0.75);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      font-size: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Chat Suggestion Chips */
+    .chat-chips {
+      display: flex;
+      gap: 0.45rem;
+      overflow-x: auto;
+      padding: 0.25rem 0.25rem 0.65rem 0.25rem;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .chat-chips::-webkit-scrollbar { display: none; }
+    .chat-chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: #cbd5e1;
+      padding: 0.3rem 0.75rem;
+      border-radius: 2rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .chat-chip:hover {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: rgba(99, 102, 241, 0.4);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    /* Briefing Archive Items */
+    .briefing-archive-item {
+      padding: 0.65rem 0.85rem;
+      border-radius: 0.5rem;
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .briefing-archive-item:hover, .briefing-archive-item.active {
+      background: rgba(99, 102, 241, 0.15);
+      border-color: rgba(99, 102, 241, 0.35);
     }
     .tab-btn {
       background: transparent;
@@ -1014,9 +1243,13 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 
     <nav class="tabs">
       <button class="tab-btn active" onclick="switchTab('overview')">📊 Overview</button>
-      <button class="tab-btn" onclick="switchTab('chat')">💬 Live Chat</button>
+      <button class="tab-btn" onclick="switchTab('chat')">💬 Chat Studio</button>
+      <button class="tab-btn" onclick="switchTab('calendar')">📅 Calendar & Agenda</button>
       <button class="tab-btn" onclick="switchTab('tasks')">📋 Tasks & Timers</button>
+      <button class="tab-btn" onclick="switchTab('tools')">👁️ Vision & Tools</button>
       <button class="tab-btn" onclick="switchTab('notes')">🧠 Memory</button>
+      <button class="tab-btn" onclick="switchTab('briefings')">🌅 Daily Briefings</button>
+      <button class="tab-btn" onclick="switchTab('profile')">⚙️ Persona & Config</button>
       <button class="tab-btn" onclick="switchTab('interactions')">📜 Audit Log</button>
       <button class="tab-btn" onclick="switchTab('digests')">📰 Digests</button>
     </nav>
@@ -1342,7 +1575,8 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
         </div>
       </div>
     </div>
-  </main>
+    <div class="toast-container" id="toastContainer"></div>
+</main>
 
   <!-- NOTE MODAL -->
   <div id="noteModal" class="modal-overlay">
@@ -1407,6 +1641,9 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       } else {
         stopChatPolling();
       }
+      if (tabId === 'calendar') loadCalendar();
+      if (tabId === 'briefings') loadBriefingsHistory();
+      if (tabId === 'profile') loadProfile();
     }
 
     // TELEMETRY
@@ -1916,8 +2153,510 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       return safe;
     }
 
+    // TOAST NOTIFICATIONS
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const t = document.createElement('div');
+      t.className = 'toast ' + type;
+      const icon = type === 'success' ? '✅' : type === 'error' ? '⚠️' : 'ℹ️';
+      t.innerHTML = `<span>${icon}</span><span>${escapeHtml(msg)}</span>`;
+      container.appendChild(t);
+      setTimeout(() => {
+        t.style.opacity = '0';
+        t.style.transform = 'translateY(8px)';
+        setTimeout(() => t.remove(), 250);
+      }, 3500);
+    }
+
+    function sendQuickPrompt(promptText) {
+      switchTab('chat');
+      const input = document.getElementById('chatInput');
+      input.value = promptText;
+      sendChatMessage();
+    }
+
+    // CALENDAR STUDIO
+    let allCalendarEvents = [];
+    async function loadCalendar() {
+      try {
+        const resp = await fetch('/api/calendar');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        allCalendarEvents = data.events || [];
+        if (data.url) document.getElementById('calConfigUrl').value = data.url;
+        if (data.alert_mins) document.getElementById('calConfigAlertMins').value = data.alert_mins;
+        if (data.synced_at) {
+          const syncDate = new Date(data.synced_at);
+          document.getElementById('calConfigLastSync').innerText = syncDate.toLocaleTimeString() + ' ' + syncDate.toLocaleDateString();
+        }
+        renderCalendarHero();
+        renderCalendarTimeline();
+      } catch (e) {
+        console.error('Error loading calendar:', e);
+      }
+    }
+
+    function renderCalendarHero() {
+      const titleEl = document.getElementById('calHeroTitle');
+      const timeEl = document.getElementById('calHeroTime');
+      const countdownEl = document.getElementById('calHeroCountdown');
+      const locEl = document.getElementById('calHeroLocation');
+      const actionEl = document.getElementById('calHeroAction');
+      
+      const now = new Date();
+      const futureEvents = allCalendarEvents.filter(e => {
+        try {
+          return new Date(e.end_time) > now;
+        } catch (_) { return false; }
+      }).sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+
+      if (!futureEvents.length) {
+        titleEl.innerText = "No Upcoming Meetings Today";
+        timeEl.innerText = "All Clear";
+        countdownEl.innerText = "Enjoy your focus time! 🎉";
+        countdownEl.style.color = "#10b981";
+        locEl.innerText = "";
+        actionEl.innerHTML = "";
+        return;
+      }
+
+      const next = futureEvents[0];
+      const start = new Date(next.start_time);
+      const end = new Date(next.end_time);
+      const diffMins = Math.round((start - now) / 60000);
+
+      titleEl.innerText = next.title || "Untitled Meeting";
+      timeEl.innerText = start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + ' - ' + end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      locEl.innerText = next.location ? '📍 ' + next.location : '';
+
+      if (diffMins <= 0) {
+        countdownEl.innerText = "Meeting In Progress Now";
+        countdownEl.style.color = "#10b981";
+      } else if (diffMins < 60) {
+        countdownEl.innerText = `Starts in ${diffMins}m`;
+        countdownEl.style.color = "#67e8f9";
+      } else {
+        const hrs = Math.floor(diffMins / 60);
+        const remMins = diffMins % 60;
+        countdownEl.innerText = `Starts in ${hrs}h ${remMins}m`;
+        countdownEl.style.color = "#a5b4fc";
+      }
+
+      if (next.meeting_link) {
+        actionEl.innerHTML = `<a href="${escapeHtml(next.meeting_link)}" target="_blank" rel="noopener noreferrer" class="cal-join-btn">📹 Join Video Call</a>`;
+      } else {
+        actionEl.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-dim);">No video link provided</span>`;
+      }
+    }
+
+    function renderCalendarTimeline() {
+      const container = document.getElementById('calTimelineContainer');
+      if (!allCalendarEvents.length) {
+        container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 2rem;">No calendar events synced. Configure your ICS feed on the right!</div>';
+        return;
+      }
+
+      const now = new Date();
+      const todayStr = now.toDateString();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toDateString();
+
+      const groups = { today: [], tomorrow: [], upcoming: [] };
+      allCalendarEvents.forEach(e => {
+        try {
+          const d = new Date(e.start_time);
+          const ds = d.toDateString();
+          if (ds === todayStr) groups.today.push(e);
+          else if (ds === tomorrowStr) groups.tomorrow.push(e);
+          else if (d > now) groups.upcoming.push(e);
+        } catch (_) {}
+      });
+
+      let html = '';
+      const renderGroup = (title, items) => {
+        if (!items.length) return '';
+        let groupHtml = `<div class="cal-timeline-title">${title} (${items.length})</div>`;
+        items.forEach(ev => {
+          const s = new Date(ev.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+          const e = new Date(ev.end_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+          const linkBtn = ev.meeting_link ? `<a href="${escapeHtml(ev.meeting_link)}" target="_blank" rel="noopener noreferrer" class="btn-action" style="color: #67e8f9; border-color: rgba(6,182,212,0.4); font-size: 0.75rem;">📹 Join</a>` : '';
+          groupHtml += `
+            <div class="cal-event-card">
+              <span class="cal-event-time">${s} - ${e}</span>
+              <div class="cal-event-details">
+                <div class="cal-event-title">${escapeHtml(ev.title)}</div>
+                <div class="cal-event-sub">${escapeHtml(ev.location || '')}</div>
+              </div>
+              ${linkBtn}
+            </div>
+          `;
+        });
+        return groupHtml;
+      };
+
+      html += renderGroup("Today's Schedule", groups.today);
+      html += renderGroup("Tomorrow's Schedule", groups.tomorrow);
+      html += renderGroup("Upcoming Later This Week", groups.upcoming);
+      container.innerHTML = html || '<div style="text-align: center; color: var(--text-muted); padding: 2rem;">No upcoming events found.</div>';
+    }
+
+    async function syncCalendar() {
+      const spinner = document.getElementById('calSyncSpinner');
+      spinner.style.display = 'inline-block';
+      spinner.style.animation = 'spin 1s linear infinite';
+      try {
+        const resp = await fetch('/api/calendar/sync', {method: 'POST'});
+        const d = await resp.json();
+        if (resp.ok) {
+          showToast(`Synced ${d.synced} calendar events`, 'success');
+          await loadCalendar();
+        } else {
+          showToast(d.error || 'Sync failed', 'error');
+        }
+      } catch (e) {
+        showToast('Calendar sync failed: ' + e, 'error');
+      } finally {
+        spinner.style.animation = '';
+      }
+    }
+
+    async function saveCalendarConfig() {
+      const url = document.getElementById('calConfigUrl').value.trim();
+      const alertMins = parseInt(document.getElementById('calConfigAlertMins').value, 10) || 10;
+      try {
+        const resp = await fetch('/api/calendar/config', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({url, alert_mins: alertMins})
+        });
+        if (resp.ok) {
+          showToast('Calendar configuration saved!', 'success');
+          await syncCalendar();
+        } else {
+          showToast('Failed to save config', 'error');
+        }
+      } catch (e) {
+        showToast('Error: ' + e, 'error');
+      }
+    }
+
+    // IMAGE & VISION TOOLS
+    let selectedOcrBase64 = '';
+    let selectedPdfBase64List = [];
+    let selectedCompressBase64 = '';
+    let lastCompressedBase64 = '';
+
+    function handleOcrFileSelect(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        selectedOcrBase64 = event.target.result;
+        document.getElementById('ocrPreviewImg').src = selectedOcrBase64;
+        document.getElementById('ocrFileName').innerText = file.name + ' (' + Math.round(file.size / 1024) + ' KB)';
+        document.getElementById('ocrPreviewBox').style.display = 'flex';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function runOcr() {
+      if (!selectedOcrBase64) return;
+      const btn = document.getElementById('ocrRunBtn');
+      btn.innerText = 'Extracting...';
+      btn.disabled = true;
+      try {
+        const resp = await fetch('/api/tools/ocr', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({image: selectedOcrBase64})
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          document.getElementById('ocrOutputText').value = data.text || '';
+          showToast('Text extracted via local OCR!', 'success');
+        } else {
+          showToast(data.error || 'OCR failed', 'error');
+        }
+      } catch (e) {
+        showToast('OCR Error: ' + e, 'error');
+      } finally {
+        btn.innerText = '⚡ Extract Text';
+        btn.disabled = false;
+      }
+    }
+
+    function copyOcrText() {
+      const text = document.getElementById('ocrOutputText').value;
+      if (!text) return;
+      navigator.clipboard.writeText(text);
+      showToast('Copied extracted text to clipboard!', 'info');
+    }
+
+    function sendOcrToChat() {
+      const text = document.getElementById('ocrOutputText').value;
+      if (!text) {
+        showToast('No extracted text to diagnose', 'error');
+        return;
+      }
+      switchTab('chat');
+      const input = document.getElementById('chatInput');
+      input.value = "Please analyze this error traceback and diagnose the root cause with a fix:\n\n```\n" + text + "\n```";
+      input.focus();
+    }
+
+    function handlePdfFilesSelect(e) {
+      const files = Array.from(e.target.files);
+      if (!files.length) return;
+      files.forEach(f => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          selectedPdfBase64List.push(ev.target.result);
+          renderPdfThumbs();
+        };
+        reader.readAsDataURL(f);
+      });
+    }
+
+    function renderPdfThumbs() {
+      const grid = document.getElementById('pdfThumbsGrid');
+      const countLabel = document.getElementById('pdfCountLabel');
+      const compileBtn = document.getElementById('pdfCompileBtn');
+      countLabel.innerText = `${selectedPdfBase64List.length} images selected`;
+      compileBtn.disabled = selectedPdfBase64List.length === 0;
+
+      grid.innerHTML = selectedPdfBase64List.map((b64, idx) => `
+        <div class="tool-thumb">
+          <img src="${b64}">
+          <button class="tool-thumb-remove" onclick="removePdfThumb(${idx})">✕</button>
+        </div>
+      `).join('');
+    }
+
+    function removePdfThumb(idx) {
+      selectedPdfBase64List.splice(idx, 1);
+      renderPdfThumbs();
+    }
+
+    async function compileImagesToPdf() {
+      if (!selectedPdfBase64List.length) return;
+      const btn = document.getElementById('pdfCompileBtn');
+      btn.innerText = 'Compiling...';
+      btn.disabled = true;
+      try {
+        const resp = await fetch('/api/tools/pdf', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({images: selectedPdfBase64List})
+        });
+        const data = await resp.json();
+        if (resp.ok && data.pdf_base64) {
+          const byteChars = atob(data.pdf_base64);
+          const byteNumbers = new Array(byteChars.length);
+          for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], {type: 'application/pdf'});
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `khepri_compiled_${Date.now()}.pdf`;
+          a.click();
+          URL.revokeObjectURL(url);
+          showToast(`PDF Compiled (${Math.round(data.size_bytes / 1024)} KB) and downloaded!`, 'success');
+        } else {
+          showToast(data.error || 'Compilation failed', 'error');
+        }
+      } catch (e) {
+        showToast('PDF error: ' + e, 'error');
+      } finally {
+        btn.innerText = '🚀 Compile & Download PDF';
+        btn.disabled = false;
+      }
+    }
+
+    function handleCompressFileSelect(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        selectedCompressBase64 = event.target.result;
+        document.getElementById('compressRunBtn').disabled = false;
+        document.getElementById('compResultCard').style.display = 'none';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function runImageCompression() {
+      if (!selectedCompressBase64) return;
+      const btn = document.getElementById('compressRunBtn');
+      btn.innerText = 'Compressing...';
+      btn.disabled = true;
+      const quality = parseInt(document.getElementById('compQualitySlider').value, 10) || 80;
+      const maxWidth = parseInt(document.getElementById('compMaxWidthSelect').value, 10) || 1280;
+
+      try {
+        const resp = await fetch('/api/tools/compress', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({image: selectedCompressBase64, quality, max_width: maxWidth})
+        });
+        const data = await resp.json();
+        if (resp.ok && data.image_base64) {
+          lastCompressedBase64 = data.image_base64;
+          const origKb = Math.round(data.original_size / 1024);
+          const compKb = Math.round(data.compressed_size / 1024);
+          document.getElementById('compSizeDiff').innerText = `${origKb} KB ➔ ${compKb} KB`;
+          document.getElementById('compSavingsBadge').innerText = `-${data.savings_percent}% Saved`;
+          document.getElementById('compResultCard').style.display = 'flex';
+          document.getElementById('compDownloadBtn').onclick = () => {
+            const a = document.createElement('a');
+            a.href = 'data:image/webp;base64,' + lastCompressedBase64;
+            a.download = `khepri_optimized_${Date.now()}.webp`;
+            a.click();
+          };
+          showToast(`Compressed image: ${origKb}KB ➔ ${compKb}KB (${data.savings_percent}% saved)`, 'success');
+        } else {
+          showToast(data.error || 'Compression failed', 'error');
+        }
+      } catch (e) {
+        showToast('Compression error: ' + e, 'error');
+      } finally {
+        btn.innerText = '⚡ Compress Image';
+        btn.disabled = false;
+      }
+    }
+
+    // DAILY BRIEFINGS & ARCHIVES
+    let currentBriefingRaw = '';
+    async function loadBriefingsHistory() {
+      try {
+        const resp = await fetch('/api/briefings/history');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const listContainer = document.getElementById('briefingArchiveList');
+        const items = data.briefings || [];
+        if (!items.length) {
+          listContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8rem; padding: 1rem; text-align: center;">No archived briefings found.</div>';
+          return;
+        }
+        listContainer.innerHTML = items.map((b, idx) => `
+          <div class="briefing-archive-item ${idx === 0 ? 'active' : ''}" onclick="openBriefingArchive('${escapeHtml(b.filename)}')">
+            <span style="font-weight: 600; color: #fff; font-size: 0.85rem;">📅 ${escapeHtml(b.date)}</span>
+            <span style="font-size: 0.72rem; color: #94a3b8; font-family: monospace;">${Math.round(b.size_bytes / 1024)} KB</span>
+          </div>
+        `).join('');
+
+        if (items.length > 0) {
+          openBriefingArchive(items[0].filename);
+        }
+      } catch (e) {
+        console.error('Error loading briefings archive', e);
+      }
+    }
+
+    async function openBriefingArchive(filename) {
+      document.querySelectorAll('.briefing-archive-item').forEach(el => el.classList.remove('active'));
+      const found = Array.from(document.querySelectorAll('.briefing-archive-item')).find(el => el.innerText.includes(filename.replace('.md','')));
+      if (found) found.classList.add('active');
+
+      document.getElementById('briefingViewTitle').innerText = filename;
+      try {
+        const resp = await fetch('/api/briefings/content?filename=' + encodeURIComponent(filename));
+        const data = await resp.json();
+        if (resp.ok && data.content) {
+          currentBriefingRaw = data.content;
+          document.getElementById('briefingContentArea').innerHTML = formatMarkdown(data.content);
+        }
+      } catch (e) {
+        document.getElementById('briefingContentArea').innerText = 'Could not load briefing content: ' + e;
+      }
+    }
+
+    async function generateFreshBriefing() {
+      const spinner = document.getElementById('briefingGenSpinner');
+      spinner.style.animation = 'spin 1s linear infinite';
+      try {
+        const resp = await fetch('/api/briefing');
+        const data = await resp.json();
+        if (resp.ok && data.briefing) {
+          currentBriefingRaw = data.briefing;
+          document.getElementById('briefingContentArea').innerHTML = formatMarkdown(data.briefing);
+          showToast('Generated fresh daily briefing!', 'success');
+          await loadBriefingsHistory();
+        } else {
+          showToast('Failed to generate briefing', 'error');
+        }
+      } catch (e) {
+        showToast('Error: ' + e, 'error');
+      } finally {
+        spinner.style.animation = '';
+      }
+    }
+
+    function copyBriefingContent() {
+      if (!currentBriefingRaw) return;
+      navigator.clipboard.writeText(currentBriefingRaw);
+      showToast('Copied briefing markdown to clipboard!', 'info');
+    }
+
+    // USER PROFILE & PERSONA
+    async function loadProfile() {
+      try {
+        const resp = await fetch('/api/profile');
+        if (!resp.ok) return;
+        const d = await resp.json();
+        if (d.name) document.getElementById('profNameInput').value = d.name;
+        if (d.city) {
+          document.getElementById('profCityInput').value = d.city;
+          document.getElementById('briefingWeatherText').innerText = `Home City: ${d.city} • Pulling live report...`;
+        }
+        if (d.digest_pref) document.getElementById('profDigestInput').value = d.digest_pref;
+        if (d.focus) document.getElementById('profFocusInput').value = d.focus;
+        if (d.timezone) document.getElementById('profTimezoneInput').value = d.timezone;
+        if (d.persona_body) document.getElementById('profPersonaBody').value = d.persona_body;
+      } catch (e) {
+        console.error('Error loading profile', e);
+      }
+    }
+
+    function applyPersonaPreset(type) {
+      const body = document.getElementById('profPersonaBody');
+      if (type === 'concise') {
+        body.value = "# User Persona & System Instructions\n- Prefers concise, direct responses with technical precision.\n- Focus: Python, Linux systems, architecture, and automation.\n- Format: Code diffs over full re-writes, omit unnecessary pleasantries.";
+      } else if (type === 'executive') {
+        body.value = "# User Persona & System Instructions\n- Executive assistant mode: highlight deadlines, action items, and schedules.\n- Format: Bulleted executive summaries with high signal-to-noise ratio.";
+      } else if (type === 'pair') {
+        body.value = "# User Persona & System Instructions\n- Senior Pair Programmer: thoroughly analyze bugs, edge cases, and architectural trade-offs.\n- Provide unit test verification and explain reasoning clearly.";
+      }
+      showToast(`Applied ${type} persona preset`, 'info');
+    }
+
+    async function saveProfile() {
+      const name = document.getElementById('profNameInput').value.trim();
+      const city = document.getElementById('profCityInput').value.trim();
+      const digest_pref = document.getElementById('profDigestInput').value.trim();
+      const focus = document.getElementById('profFocusInput').value.trim();
+      const persona_body = document.getElementById('profPersonaBody').value;
+
+      try {
+        const resp = await fetch('/api/profile', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name, city, digest_pref, focus, persona_body})
+        });
+        if (resp.ok) {
+          showToast('Profile and agent persona saved successfully!', 'success');
+        } else {
+          showToast('Failed to save profile', 'error');
+        }
+      } catch (e) {
+        showToast('Error saving profile: ' + e, 'error');
+      }
+    }
+
     async function refreshAll() {
-      await Promise.all([loadStats(), loadTasks(), loadNotes(), loadChatHistory(), loadAuditLog(), loadDigests()]);
+      await Promise.all([loadStats(), loadTasks(), loadNotes(), loadChatHistory(), loadAuditLog(), loadDigests(), loadCalendar(), loadBriefingsHistory(), loadProfile()]);
     }
 
     async function logout() {
@@ -2091,8 +2830,36 @@ def create_web_server(
                 self._send_json(notes_list)
 
             elif path == "/api/profile":
-                prof = storage.get_user_profile(str(admin_id or "web")) if storage else {}
-                self._send_json(prof or {})
+                prof = (storage.get_user_profile(str(admin_id or "web")) if storage else {}) or {}
+                meta: Dict[str, Any] = {}
+                persona_body = ""
+                if storage and hasattr(storage, "profile_store"):
+                    meta, persona_body = storage.profile_store.load_profile()
+                combined = dict(prof)
+                combined["persona_body"] = persona_body
+                for k, v in meta.items():
+                    if k not in combined or not combined[k]:
+                        combined[k] = v
+                self._send_json(combined)
+
+            elif path == "/api/briefings/history":
+                from pithon.agent.markdown_store import BriefingStore
+                bstore = storage.briefing_store if storage and hasattr(storage, "briefing_store") else BriefingStore()
+                items = bstore.list_briefings()
+                self._send_json({"status": "ok", "briefings": items})
+
+            elif path == "/api/briefings/content":
+                from pithon.agent.markdown_store import BriefingStore
+                fname = query_params.get("filename", [""])[0] or query_params.get("date", [""])[0]
+                if not fname:
+                    self._send_json({"error": "filename or date query param required"}, status=400)
+                    return
+                bstore = storage.briefing_store if storage and hasattr(storage, "briefing_store") else BriefingStore()
+                content_str = bstore.get_briefing(fname)
+                if content_str is None:
+                    self._send_json({"error": "Briefing not found"}, status=404)
+                    return
+                self._send_json({"status": "ok", "filename": fname, "content": content_str})
 
             elif path == "/api/digests":
                 digests = storage.get_digests(limit=24) if storage else []
@@ -2199,6 +2966,135 @@ def create_web_server(
                     storage.save_calendar_events("web", events)
                     storage.update_calendar_settings("web", feed_md5=feed_md5)
                 self._send_json({"status": "ok", "synced": len(events), "feed_md5": feed_md5})
+
+            elif path == "/api/calendar/config":
+                body = self._read_json_body()
+                cal_url = body.get("url", None)
+                alert_mins_raw = body.get("alert_mins", None)
+                alert_mins = None
+                if alert_mins_raw is not None:
+                    try:
+                        alert_mins = int(alert_mins_raw)
+                    except (ValueError, TypeError):
+                        alert_mins = 10
+                if storage:
+                    storage.update_calendar_settings("web", url=cal_url, alert_mins=alert_mins)
+                    if admin_id:
+                        storage.update_calendar_settings(str(admin_id), url=cal_url, alert_mins=alert_mins)
+                self._send_json({"status": "ok", "url": cal_url, "alert_mins": alert_mins})
+
+            elif path == "/api/profile":
+                body = self._read_json_body()
+                name = body.get("name", "").strip()
+                city = body.get("city", "").strip()
+                digest_pref = body.get("digest_pref", "").strip()
+                focus = body.get("focus", "").strip()
+                cal_url = body.get("calendar_url", None)
+                alert_mins_raw = body.get("calendar_alert_mins", None)
+                alert_mins = None
+                if alert_mins_raw is not None:
+                    try:
+                        alert_mins = int(alert_mins_raw)
+                    except (ValueError, TypeError):
+                        alert_mins = 10
+                persona_body = body.get("persona_body", None)
+                if storage:
+                    storage.save_user_profile(
+                        str(admin_id or "web"),
+                        name=name,
+                        city=city,
+                        digest_pref=digest_pref,
+                        focus=focus
+                    )
+                    if cal_url is not None or alert_mins is not None:
+                        storage.update_calendar_settings(str(admin_id or "web"), url=cal_url, alert_mins=alert_mins)
+                        storage.update_calendar_settings("web", url=cal_url, alert_mins=alert_mins)
+                    if hasattr(storage, "profile_store"):
+                        meta_save: Dict[str, Any] = {}
+                        if name:
+                            meta_save["name"] = name
+                        if city:
+                            meta_save["city"] = city
+                        if digest_pref:
+                            meta_save["digest_pref"] = digest_pref
+                        if focus:
+                            meta_save["focus"] = focus
+                        if cal_url is not None:
+                            meta_save["calendar_url"] = cal_url
+                        storage.profile_store.save_profile(meta_save, body=persona_body)
+                self._send_json({"status": "ok", "message": "Profile updated successfully"})
+
+            elif path == "/api/tools/ocr":
+                from pithon.agent.image_tools import extract_text_ocr
+                body = self._read_json_body()
+                img_b64 = body.get("image", "")
+                if not img_b64:
+                    self._send_json({"error": "Base64 image required"}, status=400)
+                    return
+                if "," in img_b64:
+                    img_b64 = img_b64.split(",", 1)[1]
+                try:
+                    raw_bytes = base64.b64decode(img_b64)
+                except Exception as e:
+                    self._send_json({"error": f"Invalid base64 encoding: {e}"}, status=400)
+                    return
+                text = extract_text_ocr(raw_bytes)
+                self._send_json({"status": "ok", "text": text})
+
+            elif path == "/api/tools/pdf":
+                from pithon.agent.image_tools import images_to_pdf
+                body = self._read_json_body()
+                images_list = body.get("images", [])
+                if not images_list:
+                    self._send_json({"error": "At least one base64 image required"}, status=400)
+                    return
+                raw_images = []
+                for item in images_list:
+                    if "," in item:
+                        item = item.split(",", 1)[1]
+                    try:
+                        raw_images.append(base64.b64decode(item))
+                    except Exception:
+                        continue
+                if not raw_images:
+                    self._send_json({"error": "No valid images could be decoded"}, status=400)
+                    return
+                try:
+                    pdf_bytes = images_to_pdf(raw_images)
+                    pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
+                    self._send_json({"status": "ok", "pdf_base64": pdf_b64, "size_bytes": len(pdf_bytes)})
+                except Exception as e:
+                    self._send_json({"error": f"PDF compilation failed: {e}"}, status=500)
+
+            elif path == "/api/tools/compress":
+                from pithon.agent.image_tools import compress_image
+                body = self._read_json_body()
+                img_b64 = body.get("image", "")
+                quality = int(body.get("quality", 80))
+                max_width = int(body.get("max_width", 1280))
+                if not img_b64:
+                    self._send_json({"error": "Base64 image required"}, status=400)
+                    return
+                if "," in img_b64:
+                    img_b64 = img_b64.split(",", 1)[1]
+                try:
+                    orig_bytes = base64.b64decode(img_b64)
+                except Exception as e:
+                    self._send_json({"error": f"Invalid base64 encoding: {e}"}, status=400)
+                    return
+                orig_size = len(orig_bytes)
+                compressed = compress_image(orig_bytes, max_width=max_width, quality=quality)
+                comp_size = len(compressed)
+                pct_saved = round((1.0 - (comp_size / max(orig_size, 1))) * 100, 1) if orig_size > 0 else 0.0
+                comp_b64 = base64.b64encode(compressed).decode("utf-8")
+                self._send_json({
+                    "status": "ok",
+                    "image_base64": comp_b64,
+                    "original_size": orig_size,
+                    "compressed_size": comp_size,
+                    "savings_percent": max(0.0, pct_saved),
+                    "format": "webp"
+                })
 
             elif path == "/api/chat/clear":
                 if storage:
