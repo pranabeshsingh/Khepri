@@ -1,8 +1,6 @@
 """Deterministic intent router fast-pathing common queries without LLM token generation."""
 
 import re
-import zoneinfo
-from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple
 
 from pithon.agent.calc import safe_calculate
@@ -10,7 +8,7 @@ from pithon.agent.calendar import is_calendar_intent
 from pithon.agent.weather import is_weather_intent, extract_weather_location, get_weather_report
 from pithon.agent.time_context import get_current_time_info
 from pithon.agent.memory import search_notes
-from pithon.agent.tasks import is_task_intent, parse_task_text
+from pithon.agent.tasks import parse_task_text
 from pithon.agent.tools import execute_tool_call
 
 

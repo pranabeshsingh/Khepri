@@ -21,8 +21,6 @@ def get_ocr_engine():
     import shutil
     if shutil.which("tesseract"):
         try:
-            import pytesseract
-            from PIL import Image
             _OCR_ENGINE = "pytesseract"
             logger.info("Initialized pytesseract edge OCR engine.")
             return _OCR_ENGINE

@@ -769,10 +769,14 @@ class Storage:
 
             try:
                 cal_meta = {}
-                if url is not None: cal_meta["calendar_url"] = url
-                if alert_mins is not None: cal_meta["calendar_alert_mins"] = alert_mins
-                if feed_md5 is not None: cal_meta["calendar_feed_md5"] = feed_md5
-                if cal_meta: self.profile_store.save_profile(cal_meta)
+                if url is not None:
+                    cal_meta["calendar_url"] = url
+                if alert_mins is not None:
+                    cal_meta["calendar_alert_mins"] = alert_mins
+                if feed_md5 is not None:
+                    cal_meta["calendar_feed_md5"] = feed_md5
+                if cal_meta:
+                    self.profile_store.save_profile(cal_meta)
             except Exception:
                 pass
 

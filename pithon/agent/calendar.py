@@ -3,7 +3,7 @@
 Zero external dependencies: uses Python standard library only.
 """
 
-from datetime import datetime, date, time, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 import hashlib
 import logging
 import re

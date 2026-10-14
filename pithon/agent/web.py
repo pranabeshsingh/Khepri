@@ -17,7 +17,8 @@ from pithon.presets import get_preset_system_prompt
 from pithon.agent.memory import list_notes, get_note_content, save_note, delete_note
 from pithon.agent.calendar import fetch_and_parse_calendar
 from datetime import datetime, timezone
-import zoneinfo, os
+import zoneinfo
+import os
 from pithon.agent.calc import safe_calculate
 from pithon.agent.weather import get_weather_report, is_weather_intent, extract_weather_location
 from pithon.agent.tools import extract_tool_call, execute_tool_call

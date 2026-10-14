@@ -14,7 +14,7 @@ Aggregates:
 import logging
 from datetime import datetime
 import zoneinfo
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from pithon.agent.facts import get_interesting_fact_today, get_thought_of_the_day
 from pithon.agent.news import fetch_news_headlines, format_news_section

@@ -1,6 +1,7 @@
 """Interactive Telegram Bot router with inline keyboards, whitelist security, poll support, and native Qwen2.5 tool calling."""
 
 from datetime import datetime, timezone
+import os
 import zoneinfo
 import json
 import logging
@@ -21,7 +22,7 @@ from pithon.agent.calc import safe_calculate
 from pithon.agent.weather import get_weather_report, is_weather_intent, extract_weather_location
 from pithon.agent.memory import list_notes, save_note
 from pithon.agent.briefing import generate_daily_briefing
-from pithon.agent.calendar import fetch_and_parse_calendar, is_calendar_intent
+from pithon.agent.calendar import fetch_and_parse_calendar
 from pithon.agent.profile import (
     start_onboarding,
     handle_onboarding_step,

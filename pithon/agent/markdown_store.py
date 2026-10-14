@@ -4,8 +4,7 @@ import logging
 import os
 import re
 import threading
-from datetime import datetime, timezone
-import zoneinfo
+from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
 
 logger = logging.getLogger("pithon.markdown_store")
