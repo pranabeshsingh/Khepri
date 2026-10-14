@@ -81,6 +81,10 @@ class LlamaEngine:
             yield "\n[Error: Insufficient system memory available on host]\n"
             return
 
+        if self.llm is None:
+            yield "\n[Error: Model engine not loaded]\n"
+            return
+
         stream = self.llm(
             prompt,
             max_tokens=max_tokens,

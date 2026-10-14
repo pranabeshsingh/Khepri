@@ -1,6 +1,6 @@
 # Telegram Commands & Native Tool Calling
 
-Khepri features a hybrid interaction layer: deterministic slash commands, quick BotFather action registration, and natural conversational routing with native tool calling powered by Qwen2.5-0.5B.
+Khepri features a multi-tiered interaction layer: deterministic slash commands, quick BotFather action registration, a sub-3ms rule-based fast-path router, local edge image processing & OCR, and natural conversational tool calling powered by Qwen2.5-0.5B.
 
 ---
 
@@ -11,10 +11,10 @@ When configuring your bot in Telegram, open **[@BotFather](https://t.me/BotFathe
 ```text
 start - Open Khepri and view quick menu
 help - Show all commands and features
-briefing - Daily briefing (weather, top 10 news, facts, thought)
+briefing - Daily briefing (weather, news, milestones, quote)
 calendar - View upcoming meetings and set ICS sync URL
-init - Setup personal profile and preferences
-clear - Clear conversation context memory
+pdf - Convert attached photo(s) to PDF document
+compress - Compress attached photo to WebP format
 init - Setup personal profile and preferences
 clear - Clear conversation context memory
 time - Current date, time, and timezone
@@ -41,80 +41,81 @@ chat - Query local 0.5B AI model
 | `/help` | `/help` | Display interactive cheat sheet & commands | In-memory reference card |
 | `/briefing` | `/briefing` | Daily briefing: weather, top 10 news (5 local, 3 national, 2 world), milestones, quote, tasks | Aggregated RSS & storage engine |
 | `/calendar` | `/calendar [set <url> \| alert <mins> \| sync]` | View upcoming meetings, configure open ICS feed URL, adjust alert lead time | Zero-dependency RFC 5545 parser & scheduler |
-| `/init` | `/init` | Setup onboarding profile wizard (name, location, preferences) | SQLite user profile engine |
+| `/pdf` | Attach photo with `/pdf` | Stitch & convert photo(s) into downloadable PDF document | In-memory Pillow PDF engine |
+| `/compress` | Attach photo with `/compress` | Compress & resize photo to optimized WebP format | Pillow WebP encoder |
+| `/init` | `/init` | Setup onboarding profile wizard (name, location, preferences) | Hybrid `data/profile.md` + SQLite engine |
 | `/clear` | `/clear` | Clear conversation context memory turns | SQLite context reset engine |
-| `/time` | `/time` | Current date, time, weekday, and configured timezone | Python `zoneinfo` temporal grounder |
-| `/tasks` | `/tasks` (or `/todo`) | List pending tasks and reminders with completion toggles | SQLite task store (`/app/data/pithon.db`) |
-| `/add` | `/add Deploy v0.2 tomorrow at 5pm` | Create a new task or schedule a reminder (or `/task`) | SQLite task store + natural parser |
+| `/time` | `/time` | Current date, time, weekday, and configured timezone | Fast-path temporal grounder |
+| `/tasks` | `/tasks` (or `/todo`) | List pending tasks and reminders with completion toggles | Hybrid `data/tasks.md` + SQLite store |
+| `/add` | `/add Deploy v0.2 tomorrow at 5pm` | Create a new task or schedule a reminder (or `/task`) | Hybrid `data/tasks.md` + natural parser |
 | `/timer` | `/timer 15m Pasta` | Start a countdown alert timer | Background cron scheduler |
-| `/weather` | `/weather Tokyo` | Live temperature, humidity, wind & forecast | Instant `wttr.in` API (0 API keys) |
-| `/calc` | `/calc (1024 * 16) / 2` | Safe arithmetic evaluation | Python AST parser (Zero hallucinations) |
+| `/weather` | `/weather Tokyo` | Live temperature, humidity, wind & forecast | Fast-path `wttr.in` API (0 API keys) |
+| `/calc` | `/calc (1024 * 16) / 2` | Safe arithmetic evaluation | Fast-path Python AST (Zero hallucinations) |
 | `/notes` | `/notes` | Browse saved markdown knowledge notes | `data/notes/*.md` filesystem |
-| `/note` | `/note server-ip 192.168.1.50` | Store a key/value or note into markdown memory | `data/notes/*.md` filesystem |
+| `/note` | `/note server-ip 192.168.1.50` | Store a note or document into markdown memory | `data/notes/*.md` filesystem |
 | `/search` | `/search Docker cgroup memory limit` | Search DuckDuckGo web results | Instant DuckDuckGo search engine |
-| `/status` | `/status` | System health, RAM RSS, active tasks, uptime | Linux OS `/proc/meminfo` & Docker |
+| `/status` | `/status` | System health, RAM RSS, active tasks, uptime | Fast-path Linux OS `/proc/meminfo` & Docker |
 | `/poll` | `/poll "Meeting Time?" "10 AM" "2 PM"` | Launch native Telegram interactive poll | Native Telegram Poll API |
 | `/chat` | `/chat Explain TCP handshake in 3 bullets` | Direct query to local 0.5B SLM | `pithon-daemon` llama.cpp engine |
 
 ---
 
+## 3. Local Edge Image Processing & OCR
+
+Send any photo directly to Khepri on Telegram:
+
+* **Terminal Error Diagnosis:** Snap a photo of your screen or terminal error trace with a question (*"How do I fix this?"*). Khepri executes local C++ Tesseract OCR, extracts the stack trace, and injects it into Qwen for an immediate technical fix.
+* **Whiteboard & Document Digitization:** Send a photo with caption `/note Architecture Draft` ➔ Khepri extracts the handwritten or printed text and writes `data/notes/architecture-draft.md`.
+* **Image to PDF (`/pdf`):** Convert photos into clean, downloadable PDF documents in <15ms.
+* **Image Compression (`/compress`):** Automatically resizes and compresses oversized photos into lightweight WebP format.
+* **4GB Pi 4 Vision Architecture:** Engineered using lightweight Tesseract OCR (~20MB RAM) and SmolVLM-500M hooks, ensuring total system memory never exceeds the 4GB Raspberry Pi 4 budget.
+
 ---
 
-## 2b. Daily Briefing Engine (`/briefing`)
+## 4. Deterministic Fast-Path Router (<3ms Latency)
 
-Khepri generates a comprehensive daily briefing report combining multiple edge data sources:
-* **Personalized Header:** Addressed to the user's name from profile, exact date, and timezone.
+Small language models (0.5B) can occasionally misformat JSON tool calls or consume precious CPU cycles on simple requests. Khepri includes a deterministic rule-based fast-path router in `router.py` that intercepts high-frequency queries before they ever touch the LLM:
+
+* **Time & Date:** *"What time is it?"*, *"current time"*, *"today's date"* ➔ Sub-millisecond timezone-grounded clock.
+* **Calendar & Agenda:** *"What is in my agenda?"*, *"Any calls today?"*, *"Show my schedule"* ➔ Queries upcoming calendar meetings with clickable direct video join links.
+* **Weather:** *"How's the weather in Tokyo?"*, *"is it raining in Bengaluru"* ➔ Queries `wttr.in/<city>?format=j1` directly, returning structured live metrics without hallucinations.
+* **AST Math & Arithmetic:** *"Calculate 450 * 1.18 + 32"* ➔ Evaluates safely with Python AST parser (100% precision).
+* **Task Additions:** *"add task: Review PR 42"*, *"remind me to call John"* ➔ Synchronizes directly into `data/tasks.md` and database.
+* **Notes Search:** *"search notes: deploy"*, *"notes about docker"* ➔ Scans `data/notes/` filesystem.
+* **Status & Telemetry:** *"system status"*, *"health"*, *"uptime"* ➔ Immediate container and host telemetry report.
+
+---
+
+## 5. Daily Briefing Engine (`/briefing`)
+
+Khepri generates a comprehensive daily briefing combining multiple edge data sources:
+* **Personalized Header:** Addressed to the user's name from `data/profile.md`, exact date, and timezone.
 * **Home City Weather:** Live weather from `wttr.in` for the user's home location.
 * **Top 10 Curated Headlines:**
-  * 📍 **5 Local News** (tailored to user's registered city, e.g., Kolkata or Bengaluru)
+  * 📍 **5 Local News** (tailored to user's registered city)
   * 🇮🇳 **3 National News** (India headlines)
   * 🌐 **2 World News** (international headlines)
   * Deduplicated across sections with zero external API keys needed.
 * **Interesting About Today:** Historical or scientific milestone for the calendar day.
 * **Thought for Today:** Curated inspiring quote and philosophical wisdom.
-* **Tasks & Schedule:** Count of pending items and top scheduled tasks.
+* **Today's Agenda & Tasks:** Synchronized calendar calls with video links and pending tasks.
 * **Edge Container Health:** System status and inference engine health.
-
-Triggerable manually via `/briefing`, via Telegram interactive buttons, Web Portal pill, or scheduled automatically every morning at 9:00 AM.
-
-## 3. Natural Language Tool Calling
-
-You do not need to memorize slash commands. The Khepri conversational router intercepts and fulfills queries automatically:
-
-### 🌤️ Weather Intent Interceptor
-* **User Input:** *"How is the weather in Tokyo right now?"*
-* **Routing:** Intercepts location `Tokyo`, queries `wttr.in/Tokyo?format=j1`, returns structured live metrics (Temperature, Feels Like, Humidity, Condition) instantly without hallucinating or falling back to search engine SEO snippets.
-
-### 🧮 Math & Arithmetic Interceptor
-* **User Input:** *"Can you calculate 25 * 18.5 + 40?"*
-* **Routing:** Evaluates expression deterministically using AST parser; returns `502.5` with 100% precision.
-
-### ⏰ Scheduled Reminders & Timers
-* **User Input:** *"Remind me to check server logs in 20 minutes"*
-* **Routing:** Computes target timestamp grounded in your configured timezone (`Asia/Kolkata`); background scheduler triggers push notification when time expires.
-
-### 📝 Markdown Memory Engine
-* **User Input:** *"Save a note: SQLite database path is /app/data/pithon.db"*
-* **Routing:** Writes file to `data/notes/sqlite_database_path.md`.
-* **Subsequent Query:** *"Where is our SQLite database stored?"*
-* **Routing:** Scans `data/notes/`, injects matching note context into model prompt, and answers accurately.
+* **Archival:** Every briefing is automatically archived in Markdown format at `data/briefings/YYYY-MM-DD.md`.
 
 ---
 
-## 4. Whitelist Security & Noise Filtration
+## 6. Automated Lifecycle Schedules
+
+* **05:00 AM — Nightly Memory Compactor:** Background cron job reviews the previous day's conversations, extracts key technical decisions and user preferences, and writes a structured summary into `data/notes/daily_summary_YYYY-MM-DD.md`.
+* **09:00 AM — Morning Daily Briefing:** Weather forecast, top 10 deduplicated news headlines, historical milestones, philosophical thought, agenda, and pending tasks.
+* **07:30 PM (19:30) — Evening Wrap-Up & Tomorrow Preview:** Productivity recap (completed vs pending tasks) and preview of tomorrow's first scheduled meetings.
+* **1-Minute Calendar Alert Tick:** Proactively pings Telegram when meetings are approaching (default: 10 minutes prior).
+* **5-Minute Calendar Sync:** Synchronizes with open ICS calendar feeds using MD5 delta checks.
+
+---
+
+## 7. Whitelist Security & Noise Filtration
 
 * **Private Admin Whitelist:** Only the user matching `TELEGRAM_ADMIN_CHAT_ID` can trigger inference or view data.
 * **Unauthorized Access:** Any incoming message from unknown user IDs is silently rejected or receives an access denied notice.
 * **Silent Digest Channel (`TELEGRAM_REPORT_CHAT_ID`):** Periodic analytical summaries are pushed here. Inbound messages from channels are discarded without CPU overhead.
-
-
-### 📅 Calendar Sync & Meeting Alerts (`/calendar`)
-
-Khepri features a built-in, zero-dependency RFC 5545 iCalendar engine that continuously synchronizes with any public or open `.ics` / `webcal://` link (e.g., Google Calendar, Apple Calendar, Fastmail, Proton) every 5 minutes:
-
-* **Instant Inspection:** `/calendar` shows your next scheduled meetings with local start/end times and direct 1-click video join links (Google Meet, Zoom, Teams, Webex).
-* **Connect Feed:** `/calendar set https://calendar.google.com/calendar/ical/.../basic.ics` immediately downloads and populates the local SQLite event store.
-* **Configurable Alerts:** `/calendar alert 15` customizes how many minutes before a meeting Khepri should proactively ping you on Telegram (default is 10 minutes).
-* **Force Refresh:** `/calendar sync` manually triggers an on-demand download and parse cycle.
-* **MD5 Hashing:** Bandwidth and I/O are optimized using MD5 digests; if the calendar feed has not changed, full parsing is skipped (0ms overhead).
-* **Recurrence Support:** Standard `RRULE` specifications (`DAILY`, `WEEKLY`, `BYDAY`, `UNTIL`, `COUNT`, `EXDATE`) are expanded into a sliding window `[now - 1d, now + 14d]`.

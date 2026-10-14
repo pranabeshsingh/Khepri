@@ -242,7 +242,7 @@ def execute_tool_call(
         name = raw_name
 
     try:
-        tz = zoneinfo.ZoneInfo(tz_name)
+        tz: Any = zoneinfo.ZoneInfo(tz_name)
     except Exception:
         tz = timezone.utc
     now = datetime.now(tz)
@@ -324,10 +324,10 @@ def execute_tool_call(
     elif name == "save_note":
         title = str(args.get("title", "Note")).strip()
         content = str(args.get("content", "")).strip()
-        res = save_note(title, content, tz_name=tz_name)
-        action_verb = "Updated" if res.get("updated") else "Saved"
-        msg = f"📝 *{action_verb} note:* `{res['filename']}`\n📌 *{title}*\n\n{content}"
-        return msg, None, {"type": "note", "filename": res["filename"]}
+        note_res = save_note(title, content, tz_name=tz_name)
+        action_verb = "Updated" if note_res.get("updated") else "Saved"
+        msg = f"📝 *{action_verb} note:* `{note_res['filename']}`\n📌 *{title}*\n\n{content}"
+        return msg, None, {"type": "note", "filename": note_res["filename"]}
 
     elif name == "search_notes":
         query = str(args.get("query", "")).strip()

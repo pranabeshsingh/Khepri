@@ -57,11 +57,12 @@ def is_math_intent(text: str) -> Optional[str]:
     if m_calc:
         return m_calc.group(1).strip()
 
-    m_what = re.match(r"^(?:what is|calc|calculate)\s+([0-9\s\+\-\*\/\^\(\)\.\%]+)$", clean, re.IGNORECASE)
+    m_what = re.match(r"^(?:what is|calc|calculate)\s+", clean, re.IGNORECASE)
     if m_what:
-        expr = m_what.group(1).strip()
-        if re.search(r"[\+\-\*\/\^]", expr):
-            return expr
+        expr = clean[m_what.end():].rstrip("?").strip()
+        if expr and re.fullmatch(r"[0-9\s\+\-\*\/\^\(\)\.\%]+", expr):
+            if re.search(r"[\+\-\*\/\^]", expr):
+                return expr
 
     # Pure arithmetic expression: e.g. "450 * 1.18 + 32"
     if re.match(r"^[0-9\s\+\-\*\/\^\(\)\.\%]+$", clean) and re.search(r"[\+\-\*\/\^]", clean):
@@ -76,7 +77,7 @@ def route_fast_path(
     chat_id: str,
     tz_name: str = "Asia/Kolkata",
     admin_chat_id: str = ""
-) -> Optional[Tuple[str, Optional[Dict[str, Any]], Dict[str, Any]]]:
+) -> Optional[Tuple[str, Optional[Dict[str, Any]], Optional[Dict[str, Any]]]]:
     """Evaluate message against deterministic rule-based intents.
 
     Returns:

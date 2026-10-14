@@ -369,14 +369,14 @@ class Storage:
         with self._lock, self._get_connection() as conn:
             cursor = conn.execute("UPDATE tasks SET is_completed = 1 WHERE id = ?", (task_id,))
         self._sync_tasks_markdown()
-        return cursor.rowcount > 0
+        return int(cursor.rowcount or 0) > 0
 
     def delete_task(self, task_id: int) -> bool:
         """Delete task permanently."""
         with self._lock, self._get_connection() as conn:
             cursor = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
         self._sync_tasks_markdown()
-        return cursor.rowcount > 0
+        return int(cursor.rowcount or 0) > 0
 
     def snooze_task(self, task_id: int, hours: int = 1) -> bool:
         """Snooze a task by adding hours to current time."""
@@ -387,7 +387,7 @@ class Storage:
                 "UPDATE tasks SET due_at = ?, reminded = 0 WHERE id = ?",
                 (new_due, task_id)
             )
-            return cursor.rowcount > 0
+            return int(cursor.rowcount or 0) > 0
 
     def get_pending_reminders(self, current_iso: str) -> List[Dict[str, Any]]:
         """Retrieve uncompleted tasks that are due and haven't triggered reminders yet."""
@@ -745,7 +745,7 @@ class Storage:
         with self._lock, self._get_connection() as conn:
             conn.execute("INSERT OR IGNORE INTO user_profiles (chat_id) VALUES (?)", (target,))
             fields = []
-            vals = []
+            vals: List[Any] = []
             if url is not None:
                 fields.append("calendar_url = ?")
                 vals.append(url)
@@ -768,7 +768,7 @@ class Storage:
             conn.commit()
 
             try:
-                cal_meta = {}
+                cal_meta: Dict[str, Any] = {}
                 if url is not None:
                     cal_meta["calendar_url"] = url
                 if alert_mins is not None:

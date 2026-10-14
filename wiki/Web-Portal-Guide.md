@@ -30,19 +30,42 @@ The web portal is hosted by `pithon-agent` and bound internally to `127.0.0.1:80
   * `Task Reminder`
   * `Weather Analyst`
 
-### 📋 Task Kanban
+### 📋 Task Kanban & Checklist
 * View all active and completed reminders.
 * Add new tasks with ISO or relative timestamps.
-* Check off completed tasks with instant persistence in SQLite (`/app/data/pithon.db`).
+* Check off completed tasks with instant bidirectional synchronization into `data/tasks.md` and SQLite.
 
 ### 🧠 Markdown Memory Viewer
 * Browse all `.md` files stored in `data/notes/`.
 * Inspect raw markdown notes captured via Telegram `/note` command or natural language chat.
 * Quick-search notes by title or content snippet.
 
+### 📅 Calendar & Meeting API
+* `GET /api/calendar` — Returns synchronized upcoming meetings, feed URL, alert lead time, and last sync timestamp.
+* `POST /api/calendar/sync` — Forces an on-demand download and parse of the configured ICS URL.
+* Quick action pill `📅 Today's Agenda (/calendar)` available directly above the web chat input box.
+
+### 📰 Daily Briefings
+* Trigger `/briefing` directly from the chat suggestion pills or fetch JSON from `/api/briefing`.
+* Historical briefings are stored at `data/briefings/YYYY-MM-DD.md`.
+
 ---
 
-## 3. Reverse Proxy Configuration (Nginx)
+## 3. Hybrid Markdown Memory Synchronization
+
+Instead of locking user data inside an opaque SQLite database, Khepri employs an open, human-readable file structure under `data/`:
+
+* **`data/profile.md`:** User persona, communication style, and settings stored in YAML frontmatter + Markdown body (directly editable in nano or Obsidian).
+* **`data/tasks.md`:** Standard GitHub-flavored `- [ ]` checklist synchronized bidirectionally across the Web UI, Telegram bot, and file edits.
+* **`data/notes/*.md`:** Persistent knowledge vault, code snippets, and meeting summaries.
+* **`data/briefings/*.md`:** Historical archive of every morning and evening briefing.
+* **`pithon.db`:** Lightweight SQLite retained exclusively for high-frequency 1-minute calendar alert caching and session tokens.
+
+All file operations use thread-locking and atomic replacements (`os.replace`) to prevent file corruption or race conditions.
+
+---
+
+## 4. Reverse Proxy Configuration (Nginx)
 
 To expose the portal securely over HTTPS with Let's Encrypt:
 
@@ -62,12 +85,3 @@ server {
     # ssl_certificate and key paths...
 }
 ```
-
-
-### 📰 Daily Briefings
-Trigger `/briefing` directly from the chat suggestion pills or fetch JSON from `/api/briefing`.
-
-### Calendar & Meeting API
-* `GET /api/calendar` — Returns synchronized upcoming meetings, feed URL, alert lead time, and last sync timestamp.
-* `POST /api/calendar/sync` — Forces an on-demand download and parse of the configured ICS URL.
-* Quick action pill `📅 Today's Agenda (/calendar)` available directly above the web chat input box.

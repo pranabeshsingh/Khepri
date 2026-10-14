@@ -107,3 +107,54 @@ def test_web_api_calendar(web_server, temp_storage):
         assert data["status"] == "ok"
         assert "events" in data
         assert any(e["title"] == "Design Sprint" for e in data["events"])
+
+
+def test_web_notes_and_chat_math(web_server, temp_storage, monkeypatch, tmp_path):
+    # Set notes directory to temporary directory
+    notes_dir = str(tmp_path / "web_notes")
+    monkeypatch.setenv("NOTES_DIR", notes_dir)
+
+    # Login
+    login_req = urllib.request.Request(
+        f"{web_server}/api/login",
+        data=json.dumps({"password": "test-password-123"}).encode("utf-8"),
+        headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(login_req) as resp:
+        token = resp.headers.get("Set-Cookie", "").split("pithon_session=")[1].split(";")[0]
+
+    headers = {
+        "Cookie": f"pithon_session={token}",
+        "Content-Type": "application/json"
+    }
+
+    # 1. Add note with traversal title
+    add_req = urllib.request.Request(
+        f"{web_server}/api/notes/add",
+        data=json.dumps({"title": "../../test_safe", "content": "hello world"}).encode("utf-8"),
+        headers=headers
+    )
+    with urllib.request.urlopen(add_req) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+        assert data["status"] == "ok"
+        assert ".." not in data["note"]["filename"]
+
+    # 2. Delete note with traversal attempt
+    del_req = urllib.request.Request(
+        f"{web_server}/api/notes/delete",
+        data=json.dumps({"filename": "../../etc/passwd.md"}).encode("utf-8"),
+        headers=headers
+    )
+    with urllib.request.urlopen(del_req) as resp:
+        del_data = json.loads(resp.read().decode("utf-8"))
+        assert del_data["status"] == "ok"
+
+    # 3. Direct math evaluation in /api/chat/send
+    chat_req = urllib.request.Request(
+        f"{web_server}/api/chat/send",
+        data=json.dumps({"prompt": "calculate 25 * 4"}).encode("utf-8"),
+        headers=headers
+    )
+    with urllib.request.urlopen(chat_req) as resp:
+        chat_data = json.loads(resp.read().decode("utf-8"))
+        assert "100" in chat_data.get("response", "")

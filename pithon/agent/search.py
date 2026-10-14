@@ -4,7 +4,7 @@ import html
 import re
 import urllib.parse
 import urllib.request
-from typing import List, Dict
+from typing import List, Dict, Any
 
 SEARCH_INTENT_KEYWORDS = {
     "latest", "news", "today", "yesterday", "tomorrow", "current", "currently", "price", "stock", "score",
@@ -61,7 +61,7 @@ def search_duckduckgo(query: str, max_results: int = 3, timeout: float = 5.0) ->
     except Exception:
         return []
 
-    results = []
+    results: List[Dict[str, Any]] = []
     # Split by result container divs or match blocks
     raw_blocks = re.split(r'<div[^>]*class="[^"]*result\b', content)
     for block in raw_blocks[1:]:

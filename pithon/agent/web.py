@@ -2170,7 +2170,7 @@ def create_web_server(
 
             elif path == "/api/notes/add":
                 body = self._read_json_body()
-                title = body.get("title", "").strip()
+                title = os.path.basename(body.get("title", "").strip())
                 content = body.get("content", "").strip()
                 tags = body.get("tags", "").strip() or None
                 if title and content:
@@ -2181,7 +2181,7 @@ def create_web_server(
 
             elif path == "/api/notes/delete":
                 body = self._read_json_body()
-                filename = body.get("filename", "").strip()
+                filename = os.path.basename(body.get("filename", "").strip())
                 if filename:
                     deleted = delete_note(filename)
                     self._send_json({"status": "ok", "deleted": deleted})
@@ -2275,11 +2275,12 @@ def create_web_server(
                     reply_text = "🧹 *Conversational context cleared!* I have reset previous dialogue turns."
 
                 # 2. Check direct math intent
-                calc_m = re.search(r"^(?:calculate|calc|what is)\s+([0-9\.\s\+\-\*\/\(\)\^\%]+)[?]?$", prompt, re.IGNORECASE)
-                if not reply_text and calc_m:
-                    expr = calc_m.group(1).strip()
-                    res = safe_calculate(expr)
-                    reply_text = f"🧮 `{expr}` = *{res}*"
+                calc_prefix = re.match(r"^(?:calculate|calc|what is)\s+", prompt.strip(), re.IGNORECASE)
+                if not reply_text and calc_prefix:
+                    expr = prompt.strip()[calc_prefix.end():].rstrip("?").strip()
+                    if expr and re.fullmatch(r"[0-9\.\s\+\-\*\/\(\)\^\%]+", expr):
+                        res = safe_calculate(expr)
+                        reply_text = f"🧮 `{expr}` = *{res}*"
 
                 # 3. Check direct /note command
                 if not reply_text and prompt.startswith("/note "):

@@ -24,8 +24,19 @@ def test_router_intent_checkers():
     assert is_notes_search_intent("general question") is None
 
     assert is_math_intent("what is 450 * 1.18 + 32") == "450 * 1.18 + 32"
+    assert is_math_intent("what is 4320 / 6?") == "4320 / 6"
+    assert is_math_intent("calculate 25 * 4") == "25 * 4"
     assert is_math_intent("1024 * 64") == "1024 * 64"
     assert is_math_intent("explain python") is None
+    assert is_math_intent("what is the weather?") is None
+
+    # ReDoS resilience test
+    import time
+    long_expr = "what is " + " " * 500 + "42 * 2?"
+    t0 = time.time()
+    res = is_math_intent(long_expr)
+    assert time.time() - t0 < 0.1
+    assert res == "42 * 2"
 
 def test_route_fast_path_time(tmp_path):
     storage = Storage(str(tmp_path / "test.db"))

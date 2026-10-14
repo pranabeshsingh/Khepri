@@ -3,9 +3,9 @@
 import ast
 import math
 import operator
-from typing import Union
+from typing import Any, Union
 
-_SAFE_OPERATORS = {
+_SAFE_OPERATORS: dict[Any, Any] = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,
     ast.Mult: operator.mul,
@@ -23,7 +23,7 @@ _SAFE_CONSTANTS = {
     "tau": math.tau,
 }
 
-_SAFE_FUNCTIONS = {
+_SAFE_FUNCTIONS: dict[str, Any] = {
     "abs": abs,
     "round": round,
     "min": min,
@@ -43,7 +43,7 @@ def _eval_node(node: ast.AST) -> Union[int, float]:
     if isinstance(node, ast.Constant):
         if isinstance(node.value, (int, float)):
             return node.value
-        raise ValueError(f"Unsupported constant: {node.value}")
+        raise ValueError(f"Unsupported constant: {node.value!r}")
 
     if isinstance(node, ast.Name):
         if node.id in _SAFE_CONSTANTS:

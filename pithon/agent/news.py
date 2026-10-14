@@ -41,7 +41,7 @@ def _fetch_rss_items(url: str, limit: int = 10, timeout: float = 4.0) -> List[Di
                     if cleaned:
                         items.append({
                             "title": cleaned,
-                            "url": link_elem.text if link_elem is not None else ""
+                            "url": str(link_elem.text) if link_elem is not None and link_elem.text else ""
                         })
                 if len(items) >= limit:
                     break

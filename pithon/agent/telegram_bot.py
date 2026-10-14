@@ -672,20 +672,21 @@ class TelegramBot:
             return
 
         # Direct calculation intent (e.g. 'calculate 25 * 4', 'what is 4320 / 6?')
-        calc_m = re.search(r"^(?:calculate|calc|what is)\s+([0-9\.\s\+\-\*\/\(\)\^\%]+)[?]?$", text, re.IGNORECASE)
-        if calc_m:
-            expr = calc_m.group(1).strip()
-            res = safe_calculate(expr)
-            ans = f"🧮 `{expr}` = *{res}*"
-            if self.storage:
-                self.storage.log_interaction(
-                    chat_id=str(chat_id),
-                    user_id=str(msg.get("from", {}).get("id", "")),
-                    prompt=text,
-                    response=ans
-                )
-            self.send_message(chat_id, ans)
-            return
+        calc_prefix = re.match(r"^(?:calculate|calc|what is)\s+", text.strip(), re.IGNORECASE)
+        if calc_prefix:
+            expr = text.strip()[calc_prefix.end():].rstrip("?").strip()
+            if expr and re.fullmatch(r"[0-9\.\s\+\-\*\/\(\)\^\%]+", expr):
+                res = safe_calculate(expr)
+                ans = f"🧮 `{expr}` = *{res}*"
+                if self.storage:
+                    self.storage.log_interaction(
+                        chat_id=str(chat_id),
+                        user_id=str(msg.get("from", {}).get("id", "")),
+                        prompt=text,
+                        response=ans
+                    )
+                self.send_message(chat_id, ans)
+                return
 
         # Deterministic Intent Fast-Path (Time, Weather, Math, Agenda, Notes, Status, Tasks)
         from pithon.agent.router import route_fast_path

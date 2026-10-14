@@ -21,6 +21,29 @@ def _slugify(text: str) -> str:
     slug = re.sub(r"[^a-zA-Z0-9_\-]+", "-", text.lower().strip()).strip("-")
     return slug[:50] or "note"
 
+def _safe_note_path(filename_or_title: str, base_dir: Optional[str] = None) -> Optional[str]:
+    """Resolve and validate a note file path, ensuring it stays strictly inside the notes directory."""
+    raw_name = os.path.basename(filename_or_title.strip())
+    if raw_name.endswith(".md"):
+        stem = raw_name[:-3]
+        safe_stem = _slugify(os.path.basename(stem))
+        fname = f"{safe_stem}.md"
+    else:
+        slug = _slugify(raw_name)
+        fname = f"{slug}.md"
+
+    base_path = os.path.abspath(get_notes_dir(base_dir))
+    full_path = os.path.abspath(os.path.join(base_path, fname))
+
+    # Path traversal verification: ensure full_path stays inside base_path
+    try:
+        if os.path.commonpath([base_path, full_path]) != base_path or not full_path.startswith(base_path + os.sep):
+            return None
+    except ValueError:
+        return None
+
+    return full_path
+
 def save_note(
     title: str,
     content: str,
@@ -29,12 +52,19 @@ def save_note(
     tz_name: str = "Asia/Kolkata"
 ) -> Dict[str, Any]:
     """Save or append a note to a markdown file."""
-    notes_dir = get_notes_dir(base_dir)
-    slug = _slugify(title)
-    filepath = os.path.join(notes_dir, f"{slug}.md")
+    filepath = _safe_note_path(title, base_dir=base_dir)
+    if not filepath:
+        return {
+            "success": False,
+            "error": "Invalid note title",
+            "title": title.strip(),
+            "updated": False
+        }
+
+    slug = os.path.basename(filepath)[:-3]
 
     try:
-        tz = zoneinfo.ZoneInfo(tz_name)
+        tz: Any = zoneinfo.ZoneInfo(tz_name)
     except Exception:
         tz = timezone.utc
     now_str = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
@@ -120,34 +150,24 @@ def list_notes(base_dir: Optional[str] = None) -> List[Dict[str, Any]]:
 
 def get_note_content(title_or_slug: str, base_dir: Optional[str] = None) -> Optional[str]:
     """Fetch exact text of a note file."""
-    notes_dir = get_notes_dir(base_dir)
-    if title_or_slug.endswith(".md"):
-        filepath = os.path.join(notes_dir, title_or_slug)
-    else:
-        slug = _slugify(title_or_slug)
-        filepath = os.path.join(notes_dir, f"{slug}.md")
-    if os.path.exists(filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                return f.read()
-        except Exception:
-            return None
-    return None
+    filepath = _safe_note_path(title_or_slug, base_dir=base_dir)
+    if not filepath or not os.path.exists(filepath):
+        return None
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception:
+        return None
 
 def delete_note(filename_or_title: str, base_dir: Optional[str] = None) -> bool:
     """Delete a markdown note file."""
-    notes_dir = get_notes_dir(base_dir)
-    if filename_or_title.endswith(".md"):
-        filepath = os.path.join(notes_dir, filename_or_title)
-    else:
-        slug = _slugify(filename_or_title)
-        filepath = os.path.join(notes_dir, f"{slug}.md")
-    if os.path.exists(filepath):
-        try:
-            os.remove(filepath)
-            logger.info(f"Deleted note {filepath}")
-            return True
-        except Exception as e:
-            logger.warning(f"Failed to delete {filepath}: {e}")
-            return False
-    return False
+    filepath = _safe_note_path(filename_or_title, base_dir=base_dir)
+    if not filepath or not os.path.exists(filepath):
+        return False
+    try:
+        os.remove(filepath)
+        logger.info(f"Deleted note {filepath}")
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to delete {filepath}: {e}")
+        return False
