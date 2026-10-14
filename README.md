@@ -77,7 +77,7 @@ Khepri acts as an always-on personal companion through Telegram. You can execute
 | `/start` | `/start` | Open welcome greeting & quick interactive menu |
 | `/help` | `/help` | Display interactive cheat sheet |
 | `/briefing` | `/briefing` | Daily briefing: weather, top 10 news (5 local, 3 national, 2 world), milestones, quote, tasks |
-| `/calendar` | `/calendar`, `/calendar set <url>`, `/calendar alert <mins>`, `/calendar sync` | View upcoming meetings, set 5-min open ICS sync URL, configure reminder lead time |
+| `/calendar` | `/calendar`, `/calender`, `/agenda`, `/calendar set <url>`, `/calendar alert <mins>`, `/calendar sync` | View upcoming meetings & calls, set 5-min open ICS sync URL, configure reminder lead time |
 | `/init` | `/init` | Setup onboarding profile wizard (name, home location, digest time, focus) |
 | `/clear` | `/clear` (or `/reset`) | Clear conversation context memory turns |
 | `/time` | `/time` | Current date, time, weekday, and configured timezone |
@@ -103,6 +103,7 @@ start - Open Khepri and view quick menu
 help - Show all commands and features
 briefing - Daily briefing (weather, top 10 news, facts, thought)
 calendar - View upcoming meetings and set ICS sync URL
+agenda - View today's schedule and meeting links
 init - Setup personal profile and preferences
 clear - Clear conversation context memory
 time - Current date, time, and timezone
@@ -130,7 +131,17 @@ Triggered via `/briefing`, daily morning schedule (9:00 AM), or conversational q
 * **Thought for Today:** Curated inspiring quote and philosophical wisdom.
 * **Tasks & Edge Health:** Active tasks overview and edge container health status.
 
+### 📅 Calendar Sync & Meeting Alerts (`/calendar`, `/agenda`)
+Triggered via `/calendar`, `/calender`, `/agenda`, or natural conversational questions (*"What is in my agenda?"*, *"Any calls today?"*, *"Show my schedule"*):
+* **Multi-Provider ICS Sync:** Continuous, zero-dependency RFC 5545 iCalendar engine synchronizing every 5 minutes with any open `.ics` / `webcal://` link (Microsoft Outlook 365, Google Calendar, Apple iCloud, Proton, Fastmail).
+* **MD5 Checksum Caching:** Bandwidth and CPU are conserved via MD5 digest verification—if the calendar has not changed on the remote server, re-parsing is bypassed entirely.
+* **Instant Video Meeting Extraction:** Automatically parses video conferencing links (Microsoft Teams, Zoom, Google Meet, Webex) and formats them into clean 1-click Join buttons.
+* **Proactive Telegram Alerts:** Sends an interactive notification to your Telegram chat before your meeting starts (default 10 mins, configurable via `/calendar alert <mins>`). Includes a 1-click **Join Meeting** URL button and a **Dismiss** acknowledgment button.
+* **Daily Briefing Integration:** Seamlessly embeds today's scheduled meetings directly into the morning `/briefing`.
+* **Web Management Portal:** View upcoming meetings, trigger manual sync, and configure feed URLs via the Web UI (`http://127.0.0.1:8091`).
+
 ### Natural Language Interceptors
+* **Calendar & Agenda:** *"What is in my agenda?"*, *"Any calls today?"*, *"Show my schedule"* ➔ Instantly queries upcoming calendar meetings with clickable direct video join links.
 * **Weather:** *"How's the weather in Tokyo?"* ➔ Queries `wttr.in/Tokyo` directly, returning structured live metrics without web search hallucinations.
 * **Math:** *"What is 1024 * 64?"* ➔ Evaluated deterministically with 100% precision.
 * **Reminders:** *"Remind me to check server logs in 20 minutes"* ➔ Grounded target timestamp computed and scheduled automatically.
@@ -160,6 +171,8 @@ TELEGRAM_BOT_TOKEN="your_bot_token_from_botfather"
 TELEGRAM_ADMIN_CHAT_ID="your_numeric_chat_id"
 WEB_ADMIN_PASSWORD="set_a_secure_web_passphrase"
 TIMEZONE="Asia/Kolkata"
+# Optional: Open/Published ICS Calendar Feed URL (Outlook 365, Google Calendar, Apple iCloud)
+CALENDAR_ICS_URL="https://outlook.office365.com/.../calendar.ics"
 ```
 
 ### 3. Launch Containers
