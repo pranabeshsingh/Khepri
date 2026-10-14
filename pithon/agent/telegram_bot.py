@@ -1,5 +1,7 @@
 """Interactive Telegram Bot router with inline keyboards, whitelist security, poll support, and native Qwen2.5 tool calling."""
 
+from datetime import datetime, timezone
+import zoneinfo
 import json
 import logging
 import re
