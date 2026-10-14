@@ -208,11 +208,150 @@ class TelegramBot:
         else:
             self.answer_callback_query(cb_id)
 
+
+    def send_document(
+        self,
+        chat_id: Any,
+        file_bytes: bytes,
+        filename: str,
+        caption: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Send a document or file attachment to a Telegram chat."""
+        boundary = "----WebKitFormBoundary" + hex(int(time.time() * 1000))[2:]
+        body = bytearray()
+
+        body.extend(f"--{boundary}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{chat_id}\r\n".encode())
+        if caption:
+            body.extend(f"--{boundary}\r\nContent-Disposition: form-data; name=\"caption\"\r\n\r\n{caption}\r\n".encode())
+            body.extend(f"--{boundary}\r\nContent-Disposition: form-data; name=\"parse_mode\"\r\n\r\nMarkdown\r\n".encode())
+
+        content_type = "application/pdf" if filename.endswith(".pdf") else "application/octet-stream"
+        body.extend(f"--{boundary}\r\nContent-Disposition: form-data; name=\"document\"; filename=\"{filename}\"\r\nContent-Type: {content_type}\r\n\r\n".encode())
+        body.extend(file_bytes)
+        body.extend(b"\r\n")
+        body.extend(f"--{boundary}--\r\n".encode())
+
+        url = f"{self.api_base}/sendDocument"
+        headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
+        try:
+            req = urllib.request.Request(url, data=bytes(body), headers=headers)
+            with urllib.request.urlopen(req, timeout=30.0) as resp:
+                raw = resp.read().decode("utf-8")
+                return json.loads(raw)
+        except Exception as e:
+            logger.error(f"Telegram sendDocument error: {e}")
+            return None
+
+    def download_file(self, file_id: str) -> Optional[bytes]:
+        """Download file binary from Telegram using file_id."""
+        file_info = self._call_api("getFile", {"file_id": file_id})
+        if not file_info or not file_info.get("ok"):
+            return None
+        file_path = file_info["result"]["file_path"]
+        url = f"https://api.telegram.org/file/bot{self.token}/{file_path}"
+        try:
+            with urllib.request.urlopen(url, timeout=25.0) as resp:
+                return resp.read()
+        except Exception as e:
+            logger.error(f"Error downloading file {file_path}: {e}")
+            return None
+
+    def handle_photo_message(self, msg: Dict[str, Any]) -> None:
+        """Process incoming Telegram photo (OCR, PDF, compression, vision)."""
+        chat_id = msg.get("chat", {}).get("id")
+        photos = msg.get("photo", [])
+        if not photos:
+            return
+
+        self.send_chat_action(chat_id, action="typing")
+        best_photo = photos[-1]
+        file_id = best_photo.get("file_id")
+        if not file_id:
+            return
+
+        photo_bytes = self.download_file(file_id)
+        if not photo_bytes:
+            self.send_message(chat_id, "⚠️ Failed to download the attached photo from Telegram.")
+            return
+
+        caption = (msg.get("caption") or "").strip()
+        cap_lower = caption.lower()
+
+        # 1. Image to PDF command
+        if cap_lower.startswith("/pdf") or "to pdf" in cap_lower:
+            try:
+                from pithon.agent.image_tools import images_to_pdf
+                pdf_bytes = images_to_pdf([photo_bytes])
+                self.send_document(chat_id, pdf_bytes, "converted_document.pdf", caption="📄 *Here is your converted PDF document.*")
+                return
+            except Exception as e:
+                self.send_message(chat_id, f"⚠️ Error converting image to PDF: {e}")
+                return
+
+        # 2. Image compression command
+        if cap_lower.startswith("/compress") or "compress" in cap_lower:
+            try:
+                from pithon.agent.image_tools import compress_image
+                comp_bytes = compress_image(photo_bytes)
+                orig_kb = len(photo_bytes) // 1024
+                new_kb = len(comp_bytes) // 1024
+                self.send_document(
+                    chat_id,
+                    comp_bytes,
+                    "compressed_image.webp",
+                    caption=f"🗜️ *Optimized Image:*\nOriginal: `{orig_kb} KB` ➔ Compressed: `{new_kb} KB`"
+                )
+                return
+            except Exception as e:
+                self.send_message(chat_id, f"⚠️ Error compressing image: {e}")
+                return
+
+        # 3. OCR Text Extraction (Tier 1)
+        from pithon.agent.image_tools import extract_text_ocr
+        extracted_text = extract_text_ocr(photo_bytes)
+
+        # If user asked to save as a note
+        if cap_lower.startswith("/note") or "save note" in cap_lower:
+            title_match = re.search(r"^(?:/note|save note)\s*(.*?)$", caption, re.IGNORECASE)
+            title = title_match.group(1).strip() if title_match else "Image OCR Note"
+            if not title:
+                title = "Image OCR Note"
+            from pithon.agent.memory import save_note
+            saved = save_note(title, extracted_text, tags="ocr,image", tz_name=self.tz_name)
+            self.send_message(chat_id, f"📝 *Saved Note from Image:*\nTitle: `{saved['title']}`\n\n```\n{extracted_text[:400]}\n```")
+            return
+
+        # If user asked a question about the image/error
+        if caption:
+            prompt = (
+                f"Here is the text extracted from the user's photo/screenshot via OCR:\n"
+                f"```\n{extracted_text}\n```\n\n"
+                f"User Question: {caption}\n"
+                f"Please provide a concise, helpful technical response."
+            )
+            ans = self._query_daemon(prompt)
+            self.send_message(chat_id, ans)
+            return
+
+        # If no caption, return clean OCR text
+        if extracted_text and not extracted_text.startswith("ℹ️"):
+            self.send_message(
+                chat_id,
+                f"🔍 *Extracted Text from Image:*\n\n```\n{extracted_text}\n```\n\n_Tip: Add a caption to ask a question or use `/pdf` to convert._"
+            )
+        else:
+            self.send_message(chat_id, "ℹ️ No readable text detected in this image. Send with caption `/pdf` to convert to document.")
+
     def handle_message(self, msg: Dict[str, Any]) -> None:
         """Process inbound Telegram messages."""
         chat_id = msg.get("chat", {}).get("id")
         # Strict Whitelist Check
         if not self.is_authorized(chat_id):
+            return
+
+        # Check if incoming message is a photo
+        if msg.get("photo"):
+            self.handle_photo_message(msg)
             return
 
         text = (msg.get("text") or "").strip()
@@ -547,15 +686,11 @@ class TelegramBot:
             self.send_message(chat_id, ans)
             return
 
-        # Direct conversational calendar/agenda intent (e.g. 'what is in my agenda', 'what calls do i have today?')
-        if is_calendar_intent(text):
-            days = 2 if "tomorrow" in text.lower() else 1
-            reply_text, reply_markup, ctx = execute_tool_call(
-                {"name": "get_calendar_events", "arguments": {"days": days}},
-                self.storage,
-                str(chat_id),
-                self.tz_name
-            )
+        # Deterministic Intent Fast-Path (Time, Weather, Math, Agenda, Notes, Status, Tasks)
+        from pithon.agent.router import route_fast_path
+        fast_res = route_fast_path(text, self.storage, str(chat_id), self.tz_name, self.admin_chat_id)
+        if fast_res:
+            reply_text, reply_markup, ctx = fast_res
             if self.storage:
                 self.storage.log_interaction(
                     chat_id=str(chat_id),

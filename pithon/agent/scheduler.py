@@ -233,9 +233,106 @@ class Scheduler:
 
         return dispatched
 
+
+    def compact_memory_tick(self) -> Optional[str]:
+        """Nightly job at 5:00 AM: consolidate yesterday's chat turns into a clean markdown summary."""
+        if not self.storage:
+            return None
+        tz = self._get_tz()
+        now_local = datetime.now(tz)
+        yesterday = (now_local - timedelta(days=1)).strftime("%Y-%m-%d")
+
+        # Query interactions from yesterday
+        history = self.storage.get_recent_history(limit=50, chat_id=self.admin_chat_id)
+        if not history:
+            return None
+
+        # Filter out noisy or trivial single-word commands
+        meaningful = []
+        for h in history:
+            text = h.get("content", "").strip()
+            if text and not text.startswith(("/", "time", "weather", "cal")):
+                meaningful.append(text)
+
+        if not meaningful:
+            return None
+
+        summary_lines = [
+            f"# Daily Conversation Summary — {yesterday}",
+            f"- **Compacted At:** `{now_local.strftime('%Y-%m-%d %H:%M:%S')} {self.tz_name}`",
+            f"- **Interactions Consolidated:** `{len(meaningful)}`\n",
+            "## Key Discussions & Focus Points"
+        ]
+        for idx, item in enumerate(meaningful[:12], 1):
+            clean_item = item.replace("\n", " ")
+            summary_lines.append(f"{idx}. {clean_item[:160]}")
+
+        summary_text = "\n".join(summary_lines) + "\n"
+        from pithon.agent.memory import save_note
+        save_note(
+            title=f"daily-summary-{yesterday}",
+            content=summary_text,
+            tags="daily-summary,compactor,memory",
+            tz_name=self.tz_name
+        )
+        logger.info(f"Nightly compactor saved summary for {yesterday}")
+        return summary_text
+
+    def evening_wrapup_tick(self) -> str:
+        """Compile and send evening debrief and tomorrow preview at 7:30 PM."""
+        tz = self._get_tz()
+        now_local = datetime.now(tz)
+        today_str = now_local.strftime("%A, %d %B")
+
+        # Tasks stats
+        completed_today = 0
+        pending_tasks = []
+        if self.storage:
+            all_tasks = self.storage.get_tasks(self.admin_chat_id, include_completed=True)
+            pending_tasks = [t for t in all_tasks if not t.get("is_completed")]
+            completed_today = len([t for t in all_tasks if t.get("is_completed")])
+
+        # Tomorrow's meetings
+        tomorrow_start = (now_local + timedelta(days=1)).replace(hour=0, minute=0, second=0).astimezone(timezone.utc).isoformat()
+        tomorrow_events = self.storage.get_upcoming_events(self.admin_chat_id, limit=5, start_after=tomorrow_start) if self.storage else []
+
+        lines = [
+            f"🌙 *Evening Wrap-up & Tomorrow's Preview*\n"
+            f"📅 *{today_str}*\n\n"
+            f"*Today's Productivity:*\n"
+            f"• *Completed Tasks:* `{completed_today}`\n"
+            f"• *Pending Carryover Tasks:* `{len(pending_tasks)}`"
+        ]
+
+        if pending_tasks:
+            lines.append("\n*Top Pending Tasks:*")
+            for t in pending_tasks[:3]:
+                lines.append(f"• `{t['title']}`")
+
+        if tomorrow_events:
+            lines.append("\n*Tomorrow's First Meetings:*")
+            for ev in tomorrow_events[:3]:
+                ev_start = datetime.fromisoformat(ev["start_time"]).astimezone(tz)
+                lines.append(f"• `{ev_start.strftime('%I:%M %p')}` — *{ev['title']}*")
+        else:
+            lines.append("\n*Tomorrow:* No early morning meetings scheduled. ✨")
+
+        lines.append("\n_Rest up and have a great evening!_")
+        wrapup_msg = "\n".join(lines)
+
+        if self.bot and self.admin_chat_id:
+            try:
+                self.bot.send_message(self.admin_chat_id, wrapup_msg, disable_web_page_preview=True)
+            except Exception as e:
+                logger.error(f"Failed to send evening wrapup: {e}")
+
+        return wrapup_msg
+
     def _loop(self) -> None:
         last_hour = -1
         last_briefing_date = None
+        last_compact_date = None
+        last_evening_date = None
         last_sync_epoch = 0.0
         while self._running:
             try:
@@ -261,6 +358,16 @@ class Scheduler:
                 if current_time.hour == 9 and current_time.minute == 0 and last_briefing_date != current_time.date():
                     last_briefing_date = current_time.date()
                     self.daily_briefing_tick()
+
+                # 4. Evening Wrap-Up at 7:30 PM (19:30) local time
+                if current_time.hour == 19 and current_time.minute == 30 and last_evening_date != current_time.date():
+                    last_evening_date = current_time.date()
+                    self.evening_wrapup_tick()
+
+                # 5. Nightly Memory Compactor at 5:00 AM local time
+                if current_time.hour == 5 and current_time.minute == 0 and last_compact_date != current_time.date():
+                    last_compact_date = current_time.date()
+                    self.compact_memory_tick()
 
             except Exception as e:
                 logger.error(f"Scheduler tick error: {e}")

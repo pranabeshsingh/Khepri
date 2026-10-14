@@ -147,3 +147,42 @@ def test_calendar_sync_tick(temp_storage, mock_bot):
         upcoming = temp_storage.get_upcoming_events(admin_id)
         assert len(upcoming) == 1
         assert upcoming[0]["title"] == "Synced Standup"
+
+def test_scheduler_evening_wrapup(mock_bot, temp_storage):
+    admin_id = "admin_1"
+    scheduler = Scheduler(
+        bot=mock_bot,
+        storage=temp_storage,
+        admin_chat_id=admin_id,
+        tz_name="Asia/Kolkata"
+    )
+    temp_storage.create_task(admin_id, "Pending Test Task")
+    tid_done = temp_storage.create_task(admin_id, "Completed Test Task")
+    temp_storage.complete_task(tid_done)
+
+    wrapup = scheduler.evening_wrapup_tick()
+    assert "Evening Wrap-up" in wrapup
+    assert "Completed Tasks" in wrapup
+    assert "Pending Carryover Tasks" in wrapup
+    mock_bot.send_message.assert_called_once()
+
+
+def test_scheduler_compact_memory(mock_bot, temp_storage):
+    admin_id = "admin_1"
+    scheduler = Scheduler(
+        bot=mock_bot,
+        storage=temp_storage,
+        admin_chat_id=admin_id,
+        tz_name="Asia/Kolkata"
+    )
+    temp_storage.log_interaction(
+        chat_id=admin_id,
+        user_id=admin_id,
+        prompt="Discussed cgroup memory configuration for Docker container",
+        response="Noted, cgroup limit is 512MB."
+    )
+
+    summary = scheduler.compact_memory_tick()
+    assert summary is not None
+    assert "Daily Conversation Summary" in summary
+    assert "cgroup memory" in summary

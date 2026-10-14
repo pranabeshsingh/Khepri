@@ -172,4 +172,13 @@ def generate_daily_briefing(
     # 7. Edge Status Footer
     sections.append("⚡ *Edge Status:* All systems operational • Local inference active")
 
-    return "\n\n".join(sections)
+    briefing_text = "\n\n".join(sections)
+    try:
+        if storage and hasattr(storage, "briefing_store"):
+            storage.briefing_store.save_briefing(briefing_text)
+        else:
+            from pithon.agent.markdown_store import BriefingStore
+            BriefingStore().save_briefing(briefing_text)
+    except Exception as e:
+        logger.warning(f"Failed to archive daily briefing markdown: {e}")
+    return briefing_text

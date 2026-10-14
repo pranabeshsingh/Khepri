@@ -14,6 +14,11 @@ class Storage:
         self.db_path = db_path
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
         self._lock = threading.Lock()
+        self.data_dir = os.path.dirname(os.path.abspath(db_path))
+        from pithon.agent.markdown_store import ProfileStore, TasksStore, BriefingStore
+        self.profile_store = ProfileStore(self.data_dir)
+        self.tasks_store = TasksStore(self.data_dir)
+        self.briefing_store = BriefingStore(self.data_dir)
         self._init_db()
 
     def _get_connection(self) -> sqlite3.Connection:
@@ -286,6 +291,17 @@ class Storage:
                 res.append(item)
             return res
 
+
+    def _sync_tasks_markdown(self) -> None:
+        """Mirror SQLite tasks table into data/tasks.md."""
+        try:
+            with self._lock, self._get_connection() as conn:
+                rows = conn.execute("SELECT * FROM tasks ORDER BY due_at ASC, id DESC").fetchall()
+                tasks = [dict(r) for r in rows]
+            self.tasks_store.sync_from_tasks(tasks)
+        except Exception:
+            pass
+
     def create_task(
         self,
         chat_id: str,
@@ -302,7 +318,9 @@ class Storage:
                 """,
                 (chat_id, title.strip(), (list_name or "default").lower().strip(), due_at)
             )
-            return cursor.lastrowid
+            tid = cursor.lastrowid
+        self._sync_tasks_markdown()
+        return tid
 
     def get_tasks(
         self,
@@ -343,19 +361,22 @@ class Storage:
                 return None
             new_state = 0 if row["is_completed"] else 1
             conn.execute("UPDATE tasks SET is_completed = ? WHERE id = ?", (new_state, task_id))
-            return bool(new_state)
+        self._sync_tasks_markdown()
+        return bool(new_state)
 
     def complete_task(self, task_id: int) -> bool:
         """Mark task as completed."""
         with self._lock, self._get_connection() as conn:
             cursor = conn.execute("UPDATE tasks SET is_completed = 1 WHERE id = ?", (task_id,))
-            return cursor.rowcount > 0
+        self._sync_tasks_markdown()
+        return cursor.rowcount > 0
 
     def delete_task(self, task_id: int) -> bool:
         """Delete task permanently."""
         with self._lock, self._get_connection() as conn:
             cursor = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-            return cursor.rowcount > 0
+        self._sync_tasks_markdown()
+        return cursor.rowcount > 0
 
     def snooze_task(self, task_id: int, hours: int = 1) -> bool:
         """Snooze a task by adding hours to current time."""
@@ -490,6 +511,16 @@ class Storage:
                     """,
                     (target, name, city, digest_pref, focus, step, now_iso)
                 )
+
+            try:
+                self.profile_store.save_profile({
+                    "name": new_name,
+                    "city": new_city,
+                    "digest_pref": new_digest,
+                    "focus": new_focus
+                })
+            except Exception:
+                pass
 
             # Mirror to 'web' for unified admin experience
             if target != "web":
@@ -735,6 +766,15 @@ class Storage:
                 if target != "web":
                     conn.execute(query, (*vals, "web"))
             conn.commit()
+
+            try:
+                cal_meta = {}
+                if url is not None: cal_meta["calendar_url"] = url
+                if alert_mins is not None: cal_meta["calendar_alert_mins"] = alert_mins
+                if feed_md5 is not None: cal_meta["calendar_feed_md5"] = feed_md5
+                if cal_meta: self.profile_store.save_profile(cal_meta)
+            except Exception:
+                pass
 
     def prune_old_calendar_events(self, days: int = 7) -> int:
         """Delete events whose end_time is older than days ago to preserve DB hygiene."""

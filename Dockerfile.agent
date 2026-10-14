@@ -6,8 +6,9 @@ WORKDIR /app
 COPY pyproject.toml requirements.txt README.md ./
 COPY pithon/ ./pithon/
 
-# Install pithon without heavy C++ dependencies
+# Install dependencies and pithon
 RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir --no-deps .
 
 # Create data volume directory

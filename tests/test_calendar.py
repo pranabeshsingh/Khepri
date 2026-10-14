@@ -107,14 +107,17 @@ def test_rrule_daily_and_exdate():
 
 
 def test_fetch_and_parse_calendar_caching():
+    now_utc = datetime.now(timezone.utc)
+    t_start = (now_utc + timedelta(hours=2)).strftime("%Y%m%dT%H%M%SZ").encode()
+    t_end = (now_utc + timedelta(hours=3)).strftime("%Y%m%dT%H%M%SZ").encode()
     sample_ics = (
         b"BEGIN:VCALENDAR\r\n"
         b"VERSION:2.0\r\n"
         b"BEGIN:VEVENT\r\n"
         b"UID:one-off@example.com\r\n"
         b"SUMMARY:Client Review\r\n"
-        b"DTSTART:20261013T140000Z\r\n"
-        b"DTEND:20261013T143000Z\r\n"
+        b"DTSTART:" + t_start + b"\r\n"
+        b"DTEND:" + t_end + b"\r\n"
         b"END:VEVENT\r\n"
         b"END:VCALENDAR\r\n"
     )
