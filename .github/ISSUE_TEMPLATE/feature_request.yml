@@ -1,0 +1,44 @@
+name: "💡 Feature Request"
+description: "Suggest an idea, new agent tool, or performance optimization for Khepri"
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea to make Khepri better? We would love to hear it! Please check [GitHub Discussions](https://github.com/pranabeshsingh/Khepri/discussions) as well.
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Problem or Use Case"
+      description: "Is your feature request related to a problem or specific workflow? (e.g. 'I want to integrate home assistant sensors...')"
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: "Proposed Solution"
+      description: "Describe the solution you would like to see implemented."
+    validations:
+      required: true
+  - type: textarea
+    id: memory-hardware-impact
+    attributes:
+      label: "Hardware & Memory Impact"
+      description: "How does this proposal fit into Khepri's low-resource edge target (Raspberry Pi 4 with <750MB RAM headroom)?"
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives Considered"
+      description: "Describe any alternative solutions, tools, or workarounds you considered."
+    validations:
+      required: false
+  - type: checkboxes
+    id: participation
+    attributes:
+      label: "Willingness to Contribute"
+      options:
+        - label: "I am willing to submit a Pull Request to implement this feature."
+          required: false

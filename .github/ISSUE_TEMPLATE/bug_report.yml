@@ -1,0 +1,83 @@
+name: "🐛 Bug Report"
+description: "File a reproducible bug or unexpected behavior in Khepri"
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug report! Please check that the issue hasn't already been reported in [existing issues](https://github.com/pranabeshsingh/Khepri/issues).
+  - type: input
+    id: version
+    attributes:
+      label: "Khepri Version / Commit SHA"
+      description: "Which version or Git commit of Khepri are you running? (Run `khepri --version` or `git rev-parse HEAD`)"
+      placeholder: "e.g., 0.1.0 or de0df1e"
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: "Hardware & Operating System"
+      description: "What hardware platform and operating system is hosting Khepri?"
+      options:
+        - "Raspberry Pi 4 (4GB RAM) - Raspberry Pi OS 64-bit"
+        - "Raspberry Pi 5 (4GB/8GB RAM) - Raspberry Pi OS 64-bit"
+        - "Linux x86_64 (Debian/Ubuntu/Arch/etc.)"
+        - "Linux ARM64 (Other SBC / Cloud ARM instance)"
+        - "macOS Apple Silicon (M1/M2/M3/M4)"
+        - "Docker Container (ghcr.io/pranabeshsingh/pithon-daemon)"
+        - "Docker Container (ghcr.io/pranabeshsingh/pithon-agent)"
+        - "Other (Describe in details below)"
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: "GGUF Model Name & Quantization"
+      description: "Which model file are you loading with Khepri?"
+      placeholder: "e.g., qwen2.5-0.5b-instruct-q4_k_m.gguf or SmolLM2-135M-Instruct-Q4_K_M.gguf"
+    validations:
+      required: false
+  - type: textarea
+    id: description
+    attributes:
+      label: "Describe the Bug"
+      description: "A clear and concise description of what the bug is."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: "Steps to Reproduce"
+      description: "Steps to reproduce the behavior."
+      placeholder: |
+        1. Run `khepri serve --port 8080`
+        2. Send payload `curl ...`
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Expected Behavior"
+      description: "A clear and concise description of what you expected to happen."
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs & Error Traces"
+      description: "Paste relevant terminal logs, stack traces, or Docker container logs."
+      render: shell
+    validations:
+      required: false
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: "Confirmation"
+      options:
+        - label: "I have searched existing issues to confirm this is not a duplicate."
+          required: true
+        - label: "I am not reporting a security vulnerability here (use private reporting via SECURITY.md)."
+          required: true

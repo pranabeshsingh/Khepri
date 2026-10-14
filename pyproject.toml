@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Lightweight SLM runtime and autonomous personal agent for ARM & low-power hardware"
 authors = [{ name = "Pranabesh" }]
 readme = "README.md"
+license = { text = "Apache-2.0" }
 requires-python = ">=3.9"
 dependencies = [
     "llama-cpp-python>=0.2.80",

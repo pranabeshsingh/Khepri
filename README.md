@@ -270,6 +270,16 @@ Explore the complete documentation in the [Wiki](https://github.com/pranabeshsin
 
 ---
 
+## Community & Contributing
+
+* **[Contributing Guidelines](CONTRIBUTING.md)**: Development setup, coding standards, and pull request workflow.
+* **[Code of Conduct](CODE_OF_CONDUCT.md)**: Standards for a welcoming and inclusive community.
+* **[Accessibility Commitment](ACCESSIBILITY.md)**: Accessibility priorities, WCAG targets, and assistive tech guidance.
+* **[Security Policy](SECURITY.md)**: Supported versions and private vulnerability disclosure.
+* **[Discussions](DISCUSSIONS.md)**: Ask questions, share setups, and discuss ideas in [GitHub Discussions](https://github.com/pranabeshsingh/Khepri/discussions).
+
+---
+
 ## License
 
 Licensed under the [Apache License, Version 2.0](LICENSE).
