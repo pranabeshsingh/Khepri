@@ -92,6 +92,8 @@ Khepri acts as an always-on personal companion through Telegram. You can execute
 | `/status` | `/status` | System health, RAM RSS, active tasks, uptime |
 | `/poll` | `/poll "Meeting Time?" "10 AM" "2 PM"` | Native Telegram interactive poll |
 | `/chat` | `/chat Explain Raft consensus in 3 sentences` | Direct query to local 0.5B SLM |
+| `/pdf` | Attach photo with `/pdf` | Stitch & convert photo(s) into downloadable PDF document |
+| `/compress` | Attach photo with `/compress` | Compress & resize image to optimized WebP format |
 
 <details>
 <summary>📋 <strong>BotFather Command Setup Block (Click to Expand)</strong></summary>
@@ -139,6 +141,27 @@ Triggered via `/calendar`, `/calender`, `/agenda`, or natural conversational que
 * **Proactive Telegram Alerts:** Sends an interactive notification to your Telegram chat before your meeting starts (default 10 mins, configurable via `/calendar alert <mins>`). Includes a 1-click **Join Meeting** URL button and a **Dismiss** acknowledgment button.
 * **Daily Briefing Integration:** Seamlessly embeds today's scheduled meetings directly into the morning `/briefing`.
 * **Web Management Portal:** View upcoming meetings, trigger manual sync, and configure feed URLs via the Web UI (`http://127.0.0.1:8091`).
+
+### 📸 Local Edge Image Processing & OCR
+Send any photo directly to Khepri on Telegram:
+* **Terminal Error Diagnosis:** Snap a photo of your screen or terminal error trace with a question (*"How do I fix this?"*). Khepri runs local OCR, extracts the error text, and passes it to Qwen for an instant fix.
+* **Whiteboard & Document Digitization:** Send a photo with caption `/note Architecture Draft` ➔ Khepri extracts the text and creates `data/notes/architecture-draft.md`.
+* **Image to PDF (`/pdf`):** Convert photos into clean, downloadable PDF documents.
+* **Image Compression (`/compress`):** Automatically resizes and compresses oversized images to lightweight WebP format.
+* **4GB Pi 4 Vision Architecture:** Engineered to use lightweight C++ Tesseract OCR (~20MB RAM) and SmolVLM-500M, ensuring total system memory never exceeds the 4GB Raspberry Pi 4 budget.
+
+### 🧠 Hybrid Markdown Memory Architecture
+Instead of storing all user data in an opaque binary database, Khepri employs an open, human-readable file structure in `data/`:
+* `data/profile.md`: User persona, communication style, and settings in YAML frontmatter + Markdown body (directly editable in nano or Obsidian).
+* `data/tasks.md`: Standard GitHub-flavored `- [ ]` checklist synchronized bidirectionally with Telegram and the Web UI.
+* `data/notes/*.md`: Persistent knowledge vault and documentation.
+* `data/briefings/*.md`: Archived historical record of every morning and evening briefing.
+* `pithon.db`: Lightweight SQLite retained exclusively for high-frequency calendar alert queries and session tokens.
+
+### 🔄 Automated Lifecycle & Memory Compactor
+* **05:00 AM — Nightly Memory Compactor:** Background cron job reviews the previous day's conversations, extracts key technical decisions and user preferences, and writes a structured summary into `data/notes/daily_summary_YYYY-MM-DD.md`.
+* **09:00 AM — Morning Daily Briefing:** Weather forecast, top 10 deduplicated news headlines, historical milestones, philosophical thought, and today's agenda.
+* **07:30 PM (19:30) — Evening Wrap-Up & Tomorrow Preview:** Productivity recap (completed vs pending tasks) and preview of tomorrow's first scheduled meetings.
 
 ### Natural Language Interceptors
 * **Calendar & Agenda:** *"What is in my agenda?"*, *"Any calls today?"*, *"Show my schedule"* ➔ Instantly queries upcoming calendar meetings with clickable direct video join links.
