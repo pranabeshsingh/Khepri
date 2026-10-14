@@ -69,6 +69,7 @@ def parse_task_text(text: str, default_tz: str = "Asia/Kolkata") -> Dict[str, An
     title = re.sub(r"[?!.]+$", "", title).strip()
     title = re.sub(r"\s+", " ", title).strip()
 
+    tz: Any
     try:
         tz = zoneinfo.ZoneInfo(default_tz)
     except Exception:

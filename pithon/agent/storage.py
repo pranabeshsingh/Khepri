@@ -150,7 +150,7 @@ class Storage:
                 """,
                 (chat_id, user_id or "", prompt, search_query or "", sr_json, response, latency_ms)
             )
-            return cursor.lastrowid
+            return int(cursor.lastrowid or 0)
 
     def get_interactions(
         self,
@@ -318,7 +318,7 @@ class Storage:
                 """,
                 (chat_id, title.strip(), (list_name or "default").lower().strip(), due_at)
             )
-            tid = cursor.lastrowid
+            tid = int(cursor.lastrowid or 0)
         self._sync_tasks_markdown()
         return tid
 
@@ -423,7 +423,7 @@ class Storage:
                 """,
                 (target_chat_id, summary_text, period_start, period_end, interaction_count, 1 if sent_silent else 0)
             )
-            return cursor.lastrowid
+            return int(cursor.lastrowid or 0)
 
     def get_digests(self, limit: int = 24) -> List[Dict[str, Any]]:
         """Retrieve recent digests."""

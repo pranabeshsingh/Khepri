@@ -51,20 +51,20 @@ def _eval_node(node: ast.AST) -> Union[int, float]:
         raise ValueError(f"Unknown variable: {node.id}")
 
     if isinstance(node, ast.UnaryOp):
-        op_type = type(node.op)
-        if op_type in _SAFE_OPERATORS:
-            return _SAFE_OPERATORS[op_type](_eval_node(node.operand))
-        raise ValueError(f"Unsupported unary operator: {op_type}")
+        uop_type = type(node.op)
+        if uop_type in _SAFE_OPERATORS:
+            return _SAFE_OPERATORS[uop_type](_eval_node(node.operand))
+        raise ValueError(f"Unsupported unary operator: {uop_type}")
 
     if isinstance(node, ast.BinOp):
-        op_type = type(node.op)
-        if op_type in _SAFE_OPERATORS:
+        bop_type = type(node.op)
+        if bop_type in _SAFE_OPERATORS:
             left = _eval_node(node.left)
             right = _eval_node(node.right)
-            if op_type is ast.Pow and (right > 1000 or left > 100000):
+            if bop_type is ast.Pow and (right > 1000 or left > 100000):
                 raise ValueError("Exponent too large")
-            return _SAFE_OPERATORS[op_type](left, right)
-        raise ValueError(f"Unsupported binary operator: {op_type}")
+            return _SAFE_OPERATORS[bop_type](left, right)
+        raise ValueError(f"Unsupported binary operator: {bop_type}")
 
     if isinstance(node, ast.Call):
         if isinstance(node.func, ast.Name) and node.func.id in _SAFE_FUNCTIONS:

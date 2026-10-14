@@ -93,7 +93,8 @@ class ProfileStore:
     def save_profile(self, metadata: Dict[str, Any], body: Optional[str] = None) -> None:
         """Update profile.md frontmatter and optional persona body."""
         with _STORE_LOCK:
-            existing_meta, existing_body = {}, ""
+            existing_meta: Dict[str, Any] = {}
+            existing_body: str = ""
             if os.path.exists(self.filepath):
                 try:
                     with open(self.filepath, "r", encoding="utf-8") as f:

@@ -1,8 +1,9 @@
-name: Docker CI
+name: Docker CI & Registry Publishing
 
 on:
   push:
     branches: [ master, main ]
+    tags: [ 'v*' ]
     paths:
       - 'Dockerfile*'
       - 'docker-compose.yml'
@@ -92,3 +93,74 @@ jobs:
       - name: Run smoke tests
         run: |
           ${{ matrix.target.smoke_test }}
+
+  publish-ghcr:
+    name: Publish Multi-Arch Images to GHCR
+    runs-on: ubuntu-24.04
+    needs: [validate-compose, build-and-test]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up QEMU for multi-arch emulation
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for pithon-daemon
+        id: meta-daemon
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/pithon-daemon
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and push pithon-daemon (linux/amd64, linux/arm64)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-daemon.outputs.tags }}
+          labels: ${{ steps.meta-daemon.outputs.labels }}
+          cache-from: type=gha,scope=daemon-multiarch
+          cache-to: type=gha,mode=max,scope=daemon-multiarch
+
+      - name: Extract metadata for pithon-agent
+        id: meta-agent
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/pithon-agent
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and push pithon-agent (linux/amd64, linux/arm64)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.agent
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-agent.outputs.tags }}
+          labels: ${{ steps.meta-agent.outputs.labels }}
+          cache-from: type=gha,scope=agent-multiarch
+          cache-to: type=gha,mode=max,scope=agent-multiarch

@@ -1,0 +1,84 @@
+name: ARM64 Model Benchmark & Profiler
+
+on:
+  schedule:
+    - cron: '0 3 * * 0' # Weekly Sunday at 03:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: benchmark-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  arm64-benchmark:
+    name: Native ARM64 Inference & RAM Profiler
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies & C++ build toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr cmake build-essential curl
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install llama-cpp-python
+          pip install -e .[dev]
+
+      - name: Download Qwen2.5-0.5B GGUF Model
+        run: |
+          mkdir -p models
+          ./scripts/download_model.sh qwen models
+          ls -lh models/
+
+      - name: Run E2E Real Model Test Suite
+        run: |
+          pytest -v -s tests/test_e2e_real_model.py
+
+      - name: Benchmark Latency (Tokens/sec) & Peak RSS RAM
+        run: |
+          python3 -c "
+          import time, resource
+          from pithon.engine import LlamaEngine
+
+          print('====================================================')
+          print('      KHEPRI NATIVE ARM64 INFERENCE BENCHMARK       ')
+          print('====================================================')
+
+          t0 = time.time()
+          engine = LlamaEngine('models/qwen2.5-0.5b-instruct-q4_k_m.gguf', n_threads=2, n_batch=128)
+          load_time = time.time() - t0
+          print(f'Model load time: {load_time:.2f}s')
+
+          prompt = '<|im_start|>user\nExplain Raft consensus protocol in 3 sentences.<|im_end|>\n<|im_start|>assistant\n'
+          t_infer = time.time()
+          tokens = 0
+          full_response = ''
+          for chunk in engine.generate_stream(prompt, max_tokens=100):
+              full_response += chunk
+              tokens += 1
+          duration = time.time() - t_infer
+          tok_per_sec = tokens / max(duration, 0.001)
+
+          max_rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+          print(f'Generated tokens: {tokens} in {duration:.2f}s ({tok_per_sec:.2f} tok/s)')
+          print(f'Peak Process RSS Memory: {max_rss_mb:.2f} MB')
+          print(f'Response excerpt: {full_response.strip()[:120]}...')
+          print('----------------------------------------------------')
+
+          # Validate Raspberry Pi 4 hardware constraint (< 750MB process RSS for 0.5B)
+          assert max_rss_mb < 750.0, f'Memory footprint exceeded 750MB threshold: {max_rss_mb:.2f}MB'
+          assert tok_per_sec > 5.0, f'Inference speed below 5 tok/s on ARM: {tok_per_sec:.2f} tok/s'
+          print('>>> PASSED: Memory and latency verified for 4GB Pi 4 deployment.')
+          print('====================================================')
+          "

@@ -124,9 +124,9 @@ def route_fast_path(
     # 4. Math / Calculation Intent
     expr = is_math_intent(clean)
     if expr:
-        res = safe_calculate(expr)
-        reply = f"🧮 *Result:*\n`{expr}` = `{res}`"
-        return reply, None, {"type": "calc", "expression": expr, "result": res}
+        calc_res = safe_calculate(expr)
+        reply = f"🧮 *Result:*\n`{expr}` = `{calc_res}`"
+        return reply, None, {"type": "calc", "expression": expr, "result": calc_res}
 
     # 5. Notes Search Intent
     search_q = is_notes_search_intent(clean)

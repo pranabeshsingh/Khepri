@@ -291,22 +291,22 @@ def execute_tool_call(
                 list_name=list_name
             )
 
-        reply_markup = {
+        task_markup: Optional[Dict[str, Any]] = {
             "inline_keyboard": [
                 [{"text": f"✅ Done #{tid}", "callback_data": f"done:{tid}"}]
             ]
         }
         list_tag = f" `[{list_name}]`" if list_name != "default" else ""
         msg = f"📌 Saved #{tid}: {title}{list_tag}"
-        return msg, reply_markup, {"type": "task", "task_id": tid}
+        return msg, task_markup, {"type": "task", "task_id": tid}
 
     elif name == "list_tasks":
-        list_name = args.get("list_name")
+        target_list = str(args["list_name"]) if args.get("list_name") is not None else None
         if storage:
-            tasks = storage.get_tasks(str(chat_id), list_name=list_name)
+            tasks = storage.get_tasks(str(chat_id), list_name=target_list)
             msg, inline_kb = format_tasks_message(tasks)
-            reply_markup = {"inline_keyboard": inline_kb} if inline_kb else None
-            return msg, reply_markup, {"type": "list_tasks", "count": len(tasks)}
+            task_list_markup: Optional[Dict[str, Any]] = {"inline_keyboard": inline_kb} if inline_kb else None
+            return msg, task_list_markup, {"type": "list_tasks", "count": len(tasks)}
         return "No storage.", None, None
 
     elif name == "calculate":
@@ -356,9 +356,9 @@ def execute_tool_call(
                 domain = urllib.parse.urlparse(r["url"]).netloc.replace("www.", "")
                 url_buttons.append({"text": f"🌐 {domain[:18]}", "url": r["url"]})
 
-        reply_markup = {"inline_keyboard": [url_buttons]} if url_buttons else None
+        search_markup: Optional[Dict[str, Any]] = {"inline_keyboard": [url_buttons]} if url_buttons else None
         context_block = format_search_context(results, query)
-        return "", reply_markup, {"type": "search", "query": query, "results": results, "context": context_block}
+        return "", search_markup, {"type": "search", "query": query, "results": results, "context": context_block}
 
     elif name == "get_calendar_events":
         if not storage:

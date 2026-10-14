@@ -2128,9 +2128,9 @@ def create_web_server(
                 return
 
             if path == "/api/logout":
-                token = self._get_cookie_session()
-                if token and storage:
-                    storage.delete_session(token)
+                sess_token = self._get_cookie_session()
+                if sess_token and storage:
+                    storage.delete_session(sess_token)
                 cookie = "pithon_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
                 self._send_html(
                     '{"status":"ok"}',
@@ -2215,7 +2215,7 @@ def create_web_server(
                     return
 
                 t0 = time.time()
-                reply_text = ""
+                reply_text: Optional[str] = ""
                 search_q = None
 
                 # 0. Check /init command or active onboarding step
@@ -2240,14 +2240,15 @@ def create_web_server(
                     events = storage.get_upcoming_events("web", limit=6) if storage else []
                     if events:
                         lines = ["📅 **Upcoming Calendar Meetings & Calls:**\n"]
+                        cal_tz: Any
                         try:
-                            tz = zoneinfo.ZoneInfo(tz_name)
+                            cal_tz = zoneinfo.ZoneInfo(tz_name)
                         except Exception:
-                            tz = timezone.utc
+                            cal_tz = timezone.utc
                         for ev in events:
                             try:
-                                ev_start = datetime.fromisoformat(ev["start_time"]).astimezone(tz)
-                                ev_end = datetime.fromisoformat(ev["end_time"]).astimezone(tz)
+                                ev_start = datetime.fromisoformat(ev["start_time"]).astimezone(cal_tz)
+                                ev_end = datetime.fromisoformat(ev["end_time"]).astimezone(cal_tz)
                                 t_str = f"{ev_start.strftime('%a %d %b, %I:%M %p')} - {ev_end.strftime('%I:%M %p')}"
                                 loc = f" *({ev['location']})*" if ev.get("location") else ""
                                 if ev.get("meeting_link"):
@@ -2279,8 +2280,8 @@ def create_web_server(
                 if not reply_text and calc_prefix:
                     expr = prompt.strip()[calc_prefix.end():].rstrip("?").strip()
                     if expr and re.fullmatch(r"[0-9\.\s\+\-\*\/\(\)\^\%]+", expr):
-                        res = safe_calculate(expr)
-                        reply_text = f"🧮 `{expr}` = *{res}*"
+                        calc_res = safe_calculate(expr)
+                        reply_text = f"🧮 `{expr}` = *{calc_res}*"
 
                 # 3. Check direct /note command
                 if not reply_text and prompt.startswith("/note "):
@@ -2384,7 +2385,8 @@ def create_web_server(
                                 squery = tool_call.get("arguments", {}).get("query", prompt)
                                 _, _, ctx = execute_tool_call(tool_call, storage, admin_id, tz_name)
                                 search_q = squery
-                                gprompt = f"{ctx.get('context', '')}\n\nUser Question: {prompt}\nAnswer concisely."
+                                ctx_block = ctx.get('context', '') if ctx else ''
+                                gprompt = f"{ctx_block}\n\nUser Question: {prompt}\nAnswer concisely."
                                 p2 = json.dumps({
                                     "messages": [{"role": "system", "content": temporal_header}, {"role": "user", "content": gprompt}],
                                     "temperature": 0.2,

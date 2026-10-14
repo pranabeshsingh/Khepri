@@ -344,6 +344,7 @@ class TelegramBot:
             self.send_message(chat_id, "ℹ️ No readable text detected in this image. Send with caption `/pdf` to convert to document.")
 
     def handle_message(self, msg: Dict[str, Any]) -> None:
+        reply_markup: Optional[Dict[str, Any]] = None
         """Process inbound Telegram messages."""
         chat_id = msg.get("chat", {}).get("id")
         # Strict Whitelist Check
@@ -444,6 +445,7 @@ class TelegramBot:
             upcoming = self.storage.get_upcoming_events(str(chat_id), limit=6) if self.storage else []
             lines = ["📅 *Upcoming Calendar Meetings & Calls:*\n"]
             if upcoming:
+                tz: Any
                 try:
                     tz = zoneinfo.ZoneInfo(self.tz_name)
                 except Exception:
@@ -631,8 +633,8 @@ class TelegramBot:
             title = parts[0]
             content = parts[1] if len(parts) > 1 else ""
             if title and content:
-                res = save_note(title, content, tz_name=self.tz_name)
-                self.send_message(chat_id, f"📝 Saved note *{title}* (`{res.get('filename')}`)")
+                note_res = save_note(title, content, tz_name=self.tz_name)
+                self.send_message(chat_id, f"📝 Saved note *{title}* (`{note_res.get('filename')}`)")
             else:
                 self.send_message(chat_id, "Usage: `/note <title> <content>`")
             return
@@ -644,7 +646,7 @@ class TelegramBot:
                 if results:
                     lines = [f"🔍 *Search results for:* `{query}`\n"]
                     for r in results:
-                        lines.append(f"• [{r.get('title')}]({r.get('href')})\n  _{r.get('body')[:150]}_")
+                        lines.append(f"• [{r.get('title')}]({r.get('href')})\n  _{(r.get('body') or '')[:150]}_")
                     self.send_message(chat_id, "\n\n".join(lines))
                 else:
                     self.send_message(chat_id, f"🔍 No web results found for `{query}`.")
@@ -723,7 +725,7 @@ class TelegramBot:
                 _, url_markup, ctx = execute_tool_call(tool_call, self.storage, str(chat_id), self.tz_name)
                 # Second turn: Generate final answer grounded on search context
                 grounded_prompt = (
-                    f"{ctx.get('context', '')}\n\n"
+                    f"{ctx.get('context', '') if ctx else ''}\n\n"
                     f"User Question: {text}\n"
                     f"Answer concisely based on the search context above."
                 )
@@ -734,7 +736,7 @@ class TelegramBot:
                         user_id=str(msg.get("from", {}).get("id", "")),
                         prompt=text,
                         search_query=search_query,
-                        search_results=ctx.get("results"),
+                        search_results=ctx.get("results") if ctx else None,
                         response=grounded_answer,
                         latency_ms=latency_ms
                     )

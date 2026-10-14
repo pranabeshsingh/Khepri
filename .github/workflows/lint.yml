@@ -35,3 +35,24 @@ jobs:
 
       - name: Verify Python bytecode compilation
         run: python -m compileall pithon tests
+
+  mypy:
+    name: Mypy Static Type Checking
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Mypy & Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install mypy types-Pillow
+          pip install -e .
+
+      - name: Run Mypy
+        run: mypy pithon
