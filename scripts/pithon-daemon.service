@@ -1,0 +1,47 @@
+# Khepri systemd units — Raspberry Pi 4/5 (bare-metal install)
+#
+# TWO units are required. Khepri runs as two separate processes:
+#
+#   pithon-daemon.service  ->  the llama.cpp SLM daemon  (the "local LLM runner")
+#   pithon-agent.service   ->  Telegram bot + scheduler + web portal (port 8091)
+#
+# The previous single unit only started the daemon, so Telegram and the web
+# portal never came up under systemd.
+#
+# ---------------------------------------------------------------------------
+# INSTALL
+#   1. Adjust REPO below to your checkout path (must match `systemctl edit` needs).
+#   2. Adjust USER below if your Pi account is not "pi".
+#   3. Ensure secrets are readable by that user ONLY:  chmod 600 .env
+#   4. Copy both units to /etc/systemd/system/:
+#        sudo cp scripts/pithon-daemon.service scripts/pithon-agent.service /etc/systemd/system/
+#   5. Daemon first, then agent:
+#        sudo systemctl daemon-reload
+#        sudo systemctl enable --now pithon-daemon.service
+#        sudo systemctl enable --now pithon-agent.service
+#   6. Verify:  curl http://127.0.0.1:8090/health    (OpenAI-compatible API)
+#               curl http://127.0.0.1:8091/            (web portal; login required)
+#
+# Uses `python -m pithon.cli` rather than the `pithon` console script so a
+# relocated or partially-installed venv still works.
+# ---------------------------------------------------------------------------
+
+[Unit]
+Description=Khepri Local SLM Daemon (Raspberry Pi 4/5)
+Documentation=https://github.com/pranabeshsingh/Khepri
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/code/Khepri
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/pi/code/Khepri/.venv/bin/python -m pithon.cli serve --host 127.0.0.1 --port 8090 --model models/qwen2.5-0.5b-instruct-q4_k_m.gguf --threads 3
+Restart=always
+RestartSec=5
+# Deprioritise under memory pressure so SSH stays reachable on a 4GB Pi.
+OOMScoreAdjust=500
+
+[Install]
+WantedBy=multi-user.target

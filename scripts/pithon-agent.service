@@ -1,0 +1,36 @@
+# Khepri agent unit — Raspberry Pi 4/5 (bare-metal install)
+#
+# Starts the Telegram bot, the background scheduler, and the web portal.
+# Requires pithon-daemon.service; the agent reaches the model over HTTP.
+#
+# IMPORTANT: the daemon default is port 8080, but the compose stack publishes
+# the daemon on 8090. These units use 8090 to match `scripts/query_daemon.sh`.
+# If you run bare-metal on 8080 instead, change PITHON_DAEMON_URL to match.
+#
+# Install instructions live in scripts/pithon-daemon.service.
+
+[Unit]
+Description=Khepri Agent — Telegram Bot, Scheduler, and Web Portal (Raspberry Pi 4/5)
+Documentation=https://github.com/pranabeshsingh/Khepri
+After=network-online.target pithon-daemon.service
+Wants=network-online.target
+Requires=pithon-daemon.service
+
+[Service]
+Type=simple
+User=pi
+# Must be the repo root: the agent loads secrets from a relative .env
+# (pithon/agent/main.py:load_env_file) and resolves data/ relative to CWD.
+WorkingDirectory=/home/pi/code/Khepri
+Environment=PYTHONUNBUFFERED=1
+Environment=TIMEZONE=Asia/Kolkata
+Environment=PORT=8091
+Environment=DB_PATH=data/pithon.db
+Environment=PITHON_DAEMON_URL=http://127.0.0.1:8090
+ExecStart=/home/pi/code/Khepri/.venv/bin/python -m pithon.agent.main
+Restart=always
+RestartSec=5
+OOMScoreAdjust=500
+
+[Install]
+WantedBy=multi-user.target

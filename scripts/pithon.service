@@ -1,6 +1,18 @@
+# Legacy / superseded unit — kept for reference only. DO NOT ENABLE.
+#
+# Problems with the original:
+#   * hardcoded WorkingDirectory=/home/pi/Pithon (pre-rename path)
+#   * used the `pithon` console script, which breaks under a relocated venv
+#   * only started `pithon serve`, so Telegram and the web portal never ran
+#
+# Replace with:
+#   scripts/pithon-daemon.service   (SLM daemon)
+#   scripts/pithon-agent.service    (Telegram bot + scheduler + web portal)
+#
+# See scripts/pithon-daemon.service for install instructions.
+
 [Unit]
-Description=Pithon Local SLM Daemon (Raspberry Pi 4/5)
-After=network.target
+Description=Pithon Local SLM Daemon (SUPERSEDED — use pithon-daemon.service)
 
 [Service]
 Type=simple
@@ -9,7 +21,6 @@ WorkingDirectory=/home/pi/Pithon
 ExecStart=/home/pi/Pithon/.venv/bin/pithon serve --port 8080 --model /home/pi/Pithon/models/qwen2.5-0.5b-instruct-q4_k_m.gguf --threads 3
 Restart=always
 RestartSec=5
-# Adjust OOM score to protect SSH daemon
 OOMScoreAdjust=500
 
 [Install]
