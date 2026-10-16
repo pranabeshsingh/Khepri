@@ -21,3 +21,8 @@ data/
 
 # Documentation
 docs/
+
+# IDE / editor project files
+.idea/
+.vscode/
+*.iml
