@@ -45,9 +45,12 @@ no bundler, and no template file.
 - **Bare metal:** `python3 -m venv .venv`, `pip install --prefer-binary --extra-index-url
   https://abetlen.github.io/llama-cpp-python/whl/cpu -e .[dev]`, then `./scripts/download_model.sh`.
 - **Compose:** two containers, `pithon` (daemon, 8090) and `pithon-agent` (Telegram + portal, 8091).
-- `scripts/pithon.service` is **stale**: it hardcodes `User=pi` and `WorkingDirectory=/home/pi/Pithon`
-  (old repo name), and it only starts `pithon serve` — it never launches the agent process, so Telegram
-  and the portal do not come up under systemd. Fix or replace it rather than following it literally.
+- `scripts/pithon-daemon.service` and `scripts/pithon-agent.service` are the real units — Khepri needs
+  **both**, because the daemon and the agent are separate processes. Edit `User=` and the
+  `/home/pi/code/Khepri` paths before installing; the agent's `WorkingDirectory` must be the repo root
+  (it loads `.env` and `data/` relative to CWD). `scripts/pithon.service` is superseded — never enable it.
+  Note the units serve the daemon on **8090** (matching compose and `scripts/query_daemon.sh`), not the
+  CLI's 8080 default, so bare-metal must set `PITHON_DAEMON_URL=http://127.0.0.1:8090` to match.
 - `scripts/query_daemon.sh "prompt"` is the quickest operator probe: it streams SSE from
   `http://127.0.0.1:8090/v1/chat/completions` (override with `PITHON_PORT`). Note the default is the
   *host-mapped* 8090, not the container's 8080.
@@ -112,10 +115,12 @@ branch in `tools.execute_tool_call` (it strips non-alphanumerics and maps `calen
   and `Storage.save_user_profile()`. Hand-edits are silently overwritten. They are output, not input.
 - `data/notes/*.md` **is** the real store for notes (`agent/memory.py`).
 - `data/briefings/YYYY-MM-DD.md` is append-only archive written by `BriefingStore`.
-- `data_dir` is derived from `dirname(DB_PATH)`, so changing `DB_PATH` relocates `profile.md`, `tasks.md`,
-  and `briefings/`. It does **not** relocate notes: `web.py` calls `list_notes()` / `save_note()` without
-  a `base_dir`, so notes always resolve to `$CWD/data/notes` unless you set `NOTES_DIR`. Verified: pointing
-  `DB_PATH` at a temp dir still reported the repo's real notes.
+- `data_dir` is derived from `dirname(DB_PATH)`, and notes now follow too: every production call site
+  passes `base_dir=storage.notes_dir()` (a new `Storage` method). `base_dir=None` still falls back to
+  `$NOTES_DIR` then `data/notes`. With the default `DB_PATH` this resolves to the same `./data/notes`
+  as before, so existing installs are unaffected — but a custom `DB_PATH` now relocates notes with it.
+  Compare `realpath`s, not strings: `data_dir` is absolute while `DEFAULT_NOTES_DIR` is relative.
+  Regression coverage: `tests/test_agent_notes_scoping.py`.
 - `get_user_profile()` falls back to `chat_id='web'`, and every profile write is mirrored to the `web` row.
 - Undocumented overrides: `DATA_DIR` (markdown store) and `NOTES_DIR` (notes). Neither is in `.env.example`.
 - `data/` and `models/` are gitignored — never commit notes, the DB, or GGUF weights.
@@ -140,7 +145,8 @@ outside that set returns **403 before routing**. Consequences:
   inference coverage. Only `tests/test_e2e_real_model.py` exercises live models.
 - Run the portal locally: `python -m pithon.agent.main` with `WEB_ADMIN_PASSWORD` set, then
   `POST /api/login`. It binds `0.0.0.0:$PORT`.
-- `tests/test_agent_web.py` binds a **hardcoded port 18091**; that port must be free or the suite fails.
+- `tests/test_agent_web.py` binds an **ephemeral port (`port=0`)** and reads back `server.server_port`.
+  Keep it that way; a hardcoded port makes the suite fail whenever that port is busy.
 
 ## Testing conventions
 
