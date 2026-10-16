@@ -9,8 +9,14 @@ PROMPT="${1:-}"
 PORT="${PITHON_PORT:-8090}"
 URL="http://127.0.0.1:${PORT}/v1/chat/completions"
 
+# Read piped stdin only when it is actually something worth reading.
+#   -t 0 would also suppress a hang, but it races: a slow producer can have no
+#   bytes ready yet, so the check fails and the piped input is silently dropped.
+#   Inspecting the descriptor type instead is not racy -- a pipe or a redirected
+#   file is read in full (blocking until the writer closes), while a TTY, a
+#   closed stdin, or </dev/null is skipped without ever blocking.
 STDIN_DATA=""
-if [ ! -t 0 ]; then
+if [ ! -t 0 ] && { [ -p /dev/stdin ] || [ -f /dev/stdin ]; }; then
     STDIN_DATA=$(cat)
 fi
 

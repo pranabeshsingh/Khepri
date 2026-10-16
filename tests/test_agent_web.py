@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 import json
 import pytest
 import threading
+import unittest.mock
 import urllib.request
 import urllib.error
 from pithon.agent.web import create_web_server
@@ -334,3 +335,136 @@ def test_web_image_tools(web_server):
         assert cdata["status"] == "ok"
         assert cdata["format"] == "webp"
         assert "image_base64" in cdata
+
+
+# --- Security hardening -------------------------------------------------
+# The login throttle is module-level state keyed by client IP, so these tests
+# must clear it or they will leak lockouts into each other.
+
+@pytest.fixture(autouse=True)
+def _reset_login_throttle():
+    import pithon.agent.web as web_mod
+    with web_mod._LOGIN_LOCK:
+        web_mod._LOGIN_FAILURES.clear()
+        web_mod._LOGIN_LOCKS.clear()
+    yield
+    with web_mod._LOGIN_LOCK:
+        web_mod._LOGIN_FAILURES.clear()
+        web_mod._LOGIN_LOCKS.clear()
+
+
+def test_login_is_throttled_after_repeated_failures(web_server):
+    """Without a throttle, compare_digest alone permits unlimited passphrase guesses."""
+    statuses = []
+    for _ in range(7):
+        req = urllib.request.Request(
+            f"{web_server}/api/login",
+            data=json.dumps({"password": "wrong"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req) as resp:
+                statuses.append(resp.status)
+        except urllib.error.HTTPError as e:
+            statuses.append(e.code)
+            if e.code == 429:
+                assert "retry_after_sec" in json.loads(e.read().decode("utf-8"))
+
+    assert 429 in statuses, f"expected a lockout, got {statuses}"
+    # Lockout must persist: a correct password during the window is refused too.
+    req = urllib.request.Request(
+        f"{web_server}/api/login",
+        data=json.dumps({"password": "test-password-123"}).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 429
+    except urllib.error.HTTPError as e:
+        assert e.code == 429
+
+
+def test_successful_login_clears_the_failure_counter(web_server):
+    for _ in range(3):
+        req = urllib.request.Request(
+            f"{web_server}/api/login",
+            data=json.dumps({"password": "wrong"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            urllib.request.urlopen(req)
+        except urllib.error.HTTPError:
+            pass
+
+    good = urllib.request.Request(
+        f"{web_server}/api/login",
+        data=json.dumps({"password": "test-password-123"}).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(good) as resp:
+        assert resp.status == 200
+
+    # Counter reset, so a fresh run of failures is not instantly locked out.
+    for _ in range(4):
+        req = urllib.request.Request(
+            f"{web_server}/api/login",
+            data=json.dumps({"password": "wrong"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req) as resp:
+                assert resp.status == 401
+        except urllib.error.HTTPError as e:
+            assert e.code == 401
+
+
+def test_security_headers_present(web_server):
+    req = urllib.request.Request(f"{web_server}/login")
+    with urllib.request.urlopen(req) as resp:
+        assert resp.headers.get("X-Content-Type-Options") == "nosniff"
+        assert resp.headers.get("X-Frame-Options") == "DENY"
+        assert resp.headers.get("Referrer-Policy") == "no-referrer"
+        assert resp.headers.get("Cache-Control") == "no-store"
+
+
+def test_oversized_body_is_rejected_with_413(web_server):
+    """Unbounded base64 image reads inside a 512M cgroup are an OOM vector."""
+    import pithon.agent.web as web_mod
+    req = urllib.request.Request(
+        f"{web_server}/api/login",
+        data=json.dumps({"password": "x"}).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+    )
+    req.add_header("Content-Length", str(web_mod.MAX_REQUEST_BYTES + 1024))
+    # urllib recomputes Content-Length from data, so assert on the guard directly.
+    try:
+        with urllib.request.urlopen(req):
+            raise AssertionError("expected 413")
+    except urllib.error.HTTPError as e:
+        assert e.code == 413
+
+
+def test_calendar_set_subcommand_is_not_silently_dropped(web_server, temp_storage):
+    """The portal used to match startswith('/calendar') and discard the URL."""
+    login_req = urllib.request.Request(
+        f"{web_server}/api/login",
+        data=json.dumps({"password": "test-password-123"}).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(login_req) as resp:
+        token = resp.headers.get("Set-Cookie", "").split("pithon_session=")[1].split(";")[0]
+
+    with unittest.mock.patch(
+        "pithon.agent.calendar.fetch_and_parse_calendar", return_value=(True, "md5x", [])
+    ):
+        chat_req = urllib.request.Request(
+            f"{web_server}/api/chat/send",
+            data=json.dumps({"prompt": "/calendar set https://example.com/c.ics"}).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Cookie": f"pithon_session={token}"},
+        )
+        with urllib.request.urlopen(chat_req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+    reply = data.get("reply", "") or data.get("response", "") or str(data)
+    assert "configured" in reply.lower()
+    assert "https://example.com/c.ics" in reply

@@ -8,6 +8,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Set
 
+from pithon.agent.markdown_escape import escape_markdown
 from pithon.agent.search import search_duckduckgo
 
 logger = logging.getLogger("pithon.news")
@@ -137,9 +138,12 @@ def format_news_section(news_data: Dict[str, List[Dict[str, str]]], city: str = 
         else:
             headline, source = title, ""
 
-        # Sanitize for Telegram legacy markdown
-        headline = headline.replace("[", "(").replace("]", ")").replace("*", "").replace("_", "").strip()
-        source = source.replace("[", "(").replace("]", ")").replace("*", "").replace("_", "").strip()
+        # Headlines come from third-party RSS, so they are fully attacker-
+        # controlled input for our purposes. Escape rather than strip: deleting
+        # the characters mangles the text, and it still left backticks and
+        # backslashes live.
+        headline = escape_markdown(headline.strip())
+        source = escape_markdown(source.strip())
 
         source_tag = f" — _{source}_" if source else ""
 
@@ -149,7 +153,7 @@ def format_news_section(news_data: Dict[str, List[Dict[str, str]]], city: str = 
             return f"{idx}. {headline}{source_tag}"
 
     # Local
-    lines.append(f"\n📍 *Local ({city}):*")
+    lines.append(f"\n📍 *Local ({escape_markdown(city)}):*")
     local_items = news_data.get("local", [])
     if local_items:
         for idx, item in enumerate(local_items, 1):

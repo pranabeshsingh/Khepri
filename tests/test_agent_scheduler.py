@@ -1,4 +1,5 @@
 import pytest
+import sqlite3
 from unittest.mock import MagicMock, patch
 from datetime import datetime, timedelta, timezone
 from pithon.agent.scheduler import Scheduler
@@ -167,7 +168,27 @@ def test_scheduler_evening_wrapup(mock_bot, temp_storage):
     mock_bot.send_message.assert_called_once()
 
 
-def test_scheduler_compact_memory(mock_bot, temp_storage):
+def _backdate_last_interaction(db_path, when_utc):
+    """Rewrite the newest interactions row's created_at.
+
+    log_interaction stamps CURRENT_TIMESTAMP, but the compactor's window is a
+    real date filter, so exercising it needs rows that are actually yesterday.
+    Written with plain sqlite3 rather than a new production API purely for tests.
+    """
+    stamp = when_utc.strftime("%Y-%m-%d %H:%M:%S")
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            "UPDATE interactions SET created_at = ? WHERE id = (SELECT MAX(id) FROM interactions)",
+            (stamp,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def test_scheduler_compact_memory(mock_bot, temp_storage, tmp_path):
+    db_path = str(tmp_path / "sched_test.db")
     admin_id = "admin_1"
     scheduler = Scheduler(
         bot=mock_bot,
@@ -175,14 +196,100 @@ def test_scheduler_compact_memory(mock_bot, temp_storage):
         admin_chat_id=admin_id,
         tz_name="Asia/Kolkata"
     )
+    # Yesterday's turn: must be summarised.
     temp_storage.log_interaction(
         chat_id=admin_id,
         user_id=admin_id,
         prompt="Discussed cgroup memory configuration for Docker container",
         response="Noted, cgroup limit is 512MB."
     )
+    _backdate_last_interaction(db_path, datetime.now(timezone.utc) - timedelta(days=1))
+    # Today's turn: must NOT leak into yesterday's summary.
+    temp_storage.log_interaction(
+        chat_id=admin_id,
+        user_id=admin_id,
+        prompt="Discussed today's unrelated deploy rollback",
+        response="Rolled back cleanly."
+    )
 
     summary = scheduler.compact_memory_tick()
     assert summary is not None
     assert "Daily Conversation Summary" in summary
     assert "cgroup memory" in summary
+    # Regression guard: the compactor used to take the last N turns regardless
+    # of date, so today's conversation was filed under yesterday's heading.
+    assert "deploy rollback" not in summary
+
+
+def test_scheduler_compact_memory_skips_when_nothing_recorded_yesterday(mock_bot, temp_storage):
+    admin_id = "admin_1"
+    scheduler = Scheduler(
+        bot=mock_bot,
+        storage=temp_storage,
+        admin_chat_id=admin_id,
+        tz_name="Asia/Kolkata"
+    )
+    # Only today. Summarising it as "yesterday" would be a data-integrity bug,
+    # so the tick must no-op rather than fabricate a note.
+    temp_storage.log_interaction(
+        chat_id=admin_id,
+        user_id=admin_id,
+        prompt="Only a conversation from today",
+        response="Acknowledged."
+    )
+    assert scheduler.compact_memory_tick() is None
+
+
+def test_evening_wrapup_counts_only_todays_completions(mock_bot, temp_storage):
+    """completed_at is stamped in UTC; the day window must be built in UTC too."""
+    admin_id = "admin_1"
+    scheduler = Scheduler(
+        bot=mock_bot,
+        storage=temp_storage,
+        admin_chat_id=admin_id,
+        tz_name="Asia/Kolkata"
+    )
+    today_done = temp_storage.create_task(admin_id, "Completed today")
+    temp_storage.complete_task(today_done)
+
+    # Simulate a task finished a day ago by rewriting completed_at directly.
+    older_done = temp_storage.create_task(admin_id, "Completed yesterday")
+    temp_storage.complete_task(older_done)
+    conn = sqlite3.connect(temp_storage.db_path)
+    try:
+        conn.execute(
+            "UPDATE tasks SET completed_at = ? WHERE title = ?",
+            (
+                (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S"),
+                "Completed yesterday",
+            )
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    wrapup = scheduler.evening_wrapup_tick()
+    # Exactly one completion belongs to today, not the all-time total.
+    assert "• *Completed Tasks:* `1`" in wrapup
+
+
+def test_completed_at_cleared_on_toggle(mock_bot, temp_storage):
+    """Re-opening a task must drop completed_at, or it resurfaces in day counts."""
+    tid = temp_storage.create_task("admin_1", "Toggle me")
+    temp_storage.complete_task(tid)
+    conn = sqlite3.connect(temp_storage.db_path)
+    try:
+        assert conn.execute(
+            "SELECT completed_at FROM tasks WHERE id = ?", (tid,)
+        ).fetchone()[0] is not None
+    finally:
+        conn.close()
+
+    assert temp_storage.toggle_task(tid) is False
+    conn = sqlite3.connect(temp_storage.db_path)
+    try:
+        assert conn.execute(
+            "SELECT completed_at FROM tasks WHERE id = ?", (tid,)
+        ).fetchone()[0] is None
+    finally:
+        conn.close()

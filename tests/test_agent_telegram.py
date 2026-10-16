@@ -253,7 +253,7 @@ def test_command_calendar(bot, mock_storage):
         "from": {"id": 123456789},
         "text": "/calendar set https://test.com/events.ics"
     }
-    with patch("pithon.agent.telegram_bot.fetch_and_parse_calendar", return_value=(True, "md5_new", [])) as mock_sync,          patch.object(bot, "send_message") as mock_send:
+    with patch("pithon.agent.calendar.fetch_and_parse_calendar", return_value=(True, "md5_new", [])) as mock_sync,          patch.object(bot, "send_message") as mock_send:
         bot.handle_message(msg_set)
         mock_send.assert_called_once()
         assert "configured" in mock_send.call_args[0][1].lower()
@@ -371,3 +371,65 @@ def test_model_tool_call_get_calendar_events(bot, mock_storage):
         # Must execute the tool call, NOT print raw JSON!
         assert "{" not in reply
         assert "Architecture Review" in reply
+
+
+def test_callback_edits_do_not_use_markdownv2_strikethrough(mock_storage):
+    """Regression: ~~x~~ is MarkdownV2-only and renders as literal tildes.
+
+    The bot sends parse_mode="Markdown" (legacy), which has no strikethrough, so
+    the old text was left visibly wrapped in tildes after every Done/Del click.
+    """
+    from pithon.agent.telegram_bot import TelegramBot
+
+    admin_id = "123456789"
+    bot = TelegramBot(token="t", admin_chat_id=admin_id, storage=mock_storage)
+    tid = mock_storage.create_task(admin_id, "Buy milk")
+
+    with patch.object(bot, "answer_callback_query") as mock_ack, \
+         patch.object(bot, "edit_message_text") as mock_edit:
+        bot.handle_callback_query({
+            "id": "cb1",
+            "from": {"id": int(admin_id)},
+            "data": f"done:{tid}",
+            "message": {"message_id": 1, "chat": {"id": int(admin_id)}, "text": "📋 Buy milk"},
+        })
+        mock_ack.assert_called_once()
+        edited = mock_edit.call_args[0][2]
+        assert "~~" not in edited
+        # The original message is preserved rather than mangled.
+        assert "📋 Buy milk" in edited
+        assert "Marked completed" in edited
+        assert mock_storage.get_task_by_id(tid)["is_completed"] == 1
+
+        bot.handle_callback_query({
+            "id": "cb2",
+            "from": {"id": int(admin_id)},
+            "data": f"del:{tid}",
+            "message": {"message_id": 1, "chat": {"id": int(admin_id)}, "text": "📋 Buy milk"},
+        })
+        deleted = mock_edit.call_args[0][2]
+        assert "~~" not in deleted
+        assert "Deleted" in deleted
+        assert mock_storage.get_task_by_id(tid) is None
+
+
+def test_slm_output_is_sent_without_parse_mode(mock_storage):
+    """A stray '*' in a 0.5B completion would otherwise 400 the whole message."""
+    from pithon.agent.telegram_bot import TelegramBot
+
+    admin_id = "123456789"
+    bot = TelegramBot(token="t", admin_chat_id=admin_id, storage=mock_storage)
+    with patch.object(bot, "_query_daemon", return_value="Here is a *broken* answer"), \
+         patch.object(bot, "send_message") as mock_send, \
+         patch.object(bot, "send_chat_action"):
+        bot.handle_message({
+            "message_id": 5,
+            "chat": {"id": int(admin_id)},
+            "from": {"id": int(admin_id)},
+            "text": "Explain Raft consensus in detail",
+        })
+        assert mock_send.called
+        kwargs = mock_send.call_args.kwargs
+        assert kwargs.get("parse_mode") is None
+        # Deterministic replies keep Markdown; only model output drops it.
+        assert mock_send.call_args[0][1] == "Here is a *broken* answer"

@@ -7,6 +7,8 @@ import urllib.parse
 import urllib.request
 from typing import Dict, Any
 
+from pithon.agent.markdown_escape import escape_markdown, escape_code
+
 logger = logging.getLogger("pithon.weather")
 
 def get_weather_report(location: str) -> Dict[str, Any]:
@@ -39,8 +41,8 @@ def get_weather_report(location: str) -> Dict[str, Any]:
             country = area_info.get("country", [{}])[0].get("value", "")
 
             summary = (
-                f"🌤️ *Weather for {area_name}* ({country})\n\n"
-                f"• *Condition:* {desc}\n"
+                f"🌤️ *Weather for {escape_markdown(area_name)}* ({escape_markdown(country)})\n\n"
+                f"• *Condition:* {escape_markdown(desc)}\n"
                 f"• *Temperature:* `{temp_c}°C` (Feels like `{feels_c}°C`)\n"
                 f"• *High / Low:* `{max_c}°C` / `{min_c}°C`\n"
                 f"• *Humidity:* `{humidity}%` | *Wind:* `{wind_kmh} km/h`\n"
@@ -66,13 +68,13 @@ def get_weather_report(location: str) -> Dict[str, Any]:
                 return {
                     "success": True,
                     "location": loc_clean,
-                    "summary": f"🌤️ *Weather for {loc_clean}:*\n`{text_res}`"
+                    "summary": f"🌤️ *Weather for {escape_markdown(loc_clean)}:*\n`{escape_code(text_res)}`"
                 }
         except Exception:
             return {
                 "success": False,
                 "location": loc_clean,
-                "summary": f"⚠️ Could not fetch live weather for '{loc_clean}'. Please try again."
+                "summary": f"⚠️ Could not fetch live weather for '{escape_markdown(loc_clean)}'. Please try again."
             }
 
 

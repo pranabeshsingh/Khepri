@@ -1,11 +1,8 @@
 """Image processing utilities: OCR text extraction, PDF stitching, compression, and edge VLM."""
 
-import base64
 import io
-import json
 import logging
-import urllib.request
-from typing import List, Optional
+from typing import List
 
 logger = logging.getLogger("pithon.image")
 
@@ -119,38 +116,10 @@ def compress_image(image_bytes: bytes, max_width: int = 1280, quality: int = 80)
         return image_bytes
 
 
-def query_vision_model(
-    image_bytes: bytes,
-    prompt: str,
-    daemon_url: str = "http://127.0.0.1:8090"
-) -> Optional[str]:
-    """Query multimodal vision model (e.g. SmolVLM / Qwen2-VL) running on daemon."""
-    url = f"{daemon_url}/v1/chat/completions"
-    b64_img = base64.b64encode(image_bytes).decode("utf-8")
-
-    payload = {
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt or "Describe what you see in this image in detail."},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}}
-                ]
-            }
-        ],
-        "max_tokens": 512,
-        "temperature": 0.2
-    }
-
-    try:
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=40.0) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data["choices"][0]["message"]["content"].strip()
-    except Exception as e:
-        logger.warning(f"Multimodal vision query failed at {url}: {e}")
-        return None
+# NOTE: there is deliberately no image-understanding path here. The daemon runs
+# a text-only GGUF via engine.LlamaEngine with no chat_format and no mmproj
+# projector, so an OpenAI-style {"type": "image_url"} content array cannot be
+# served -- a previous query_vision_model() helper that posted one was dead code
+# that always failed. Khepri does "vision" via extract_text_ocr() plus the SLM
+# reasoning over the extracted text. Adding a real VLM means shipping a mmproj
+# GGUF and measuring it against the <2GB budget first; see README.

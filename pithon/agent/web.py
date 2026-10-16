@@ -6,11 +6,12 @@ import json
 import logging
 import re
 import secrets
+import threading
 import time
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pithon.agent.search import should_search, search_duckduckgo, format_search_context
 from pithon.agent.time_context import format_temporal_prompt_header
@@ -22,6 +23,7 @@ import zoneinfo
 import os
 from pithon.agent.calc import safe_calculate
 from pithon.agent.weather import get_weather_report, is_weather_intent, extract_weather_location
+from pithon.agent.calendar import handle_calendar_subcommand
 from pithon.agent.tools import extract_tool_call, execute_tool_call
 from pithon.agent.profile import (
     start_onboarding,
@@ -31,6 +33,58 @@ from pithon.agent.profile import (
 )
 
 logger = logging.getLogger("pithon.web")
+
+
+MAX_REQUEST_BYTES = 8 * 1024 * 1024  # 8 MB; OCR/PDF uploads are the only large bodies
+
+
+class _RequestTooLarge(Exception):
+    """Raised by _read_json_body when Content-Length exceeds MAX_REQUEST_BYTES."""
+
+# Login throttle. The portal is loopback-only behind a single shared passphrase,
+# but `compare_digest` alone does nothing about *volume*: without this, an
+# attacker who reaches the port can make unlimited offline guesses at the
+# passphrase. Lockout is per-IP and time-bounded rather than permanent so a
+# legitimate fat-fingered retry is not permanently locked out.
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_LOCKOUT_SEC = 300.0
+_LOGIN_FAILURES: Dict[str, List[float]] = {}
+_LOGIN_LOCKS: Dict[str, float] = {}
+_LOGIN_LOCK = threading.Lock()
+
+
+def _login_locked_out(client: str) -> float:
+    """Return remaining lockout seconds for client, or 0.0 if not locked."""
+    with _LOGIN_LOCK:
+        until = _LOGIN_LOCKS.get(client, 0.0)
+        if not until:
+            return 0.0
+        remaining = until - time.monotonic()
+        if remaining <= 0:
+            _LOGIN_LOCKS.pop(client, None)
+            _LOGIN_FAILURES.pop(client, None)
+            return 0.0
+        return remaining
+
+
+def _record_login_failure(client: str) -> float:
+    """Record a failed attempt; returns remaining lockout seconds (0 if still open)."""
+    now = time.monotonic()
+    with _LOGIN_LOCK:
+        attempts = [t for t in _LOGIN_FAILURES.get(client, []) if now - t < LOGIN_LOCKOUT_SEC]
+        attempts.append(now)
+        _LOGIN_FAILURES[client] = attempts
+        if len(attempts) >= LOGIN_MAX_ATTEMPTS:
+            _LOGIN_LOCKS[client] = now + LOGIN_LOCKOUT_SEC
+            _LOGIN_FAILURES.pop(client, None)
+            return LOGIN_LOCKOUT_SEC
+        return 0.0
+
+
+def _clear_login_failures(client: str) -> None:
+    with _LOGIN_LOCK:
+        _LOGIN_FAILURES.pop(client, None)
+        _LOGIN_LOCKS.pop(client, None)
 
 
 def mask_id(val: str) -> str:
@@ -2138,7 +2192,13 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 
     function formatMarkdown(str) {
       if (!str) return '';
-      let safe = escapeHtml(str);
+      // Server-side text is escaped for Telegram legacy Markdown (a task titled
+      // "2 * 3 review" arrives here as "2 \* 3 review"). Pull those escapes out
+      // into private-use sentinels before the entity formatters run, otherwise
+      // the backslash would leak into the DOM as a visible character, then
+      // restore them as plain text once formatting is done.
+      const ESCAPED = {'\\': '\uE000', '*': '\uE001', '_': '\uE002', '`': '\uE003', '[': '\uE004', ']': '\uE005'};
+      let safe = escapeHtml(str).replace(/\\([\\*_`\[\]])/g, function (_m, c) { return ESCAPED[c]; });
       // Links: [text](url) -> <a href="url" target="_blank" rel="noopener noreferrer">text</a>
       safe = safe.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline; text-underline-offset: 3px; font-weight: 500;">$1</a>');
       // Bold: **text** or *text*
@@ -2150,7 +2210,9 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
       safe = safe.replace(/`([^`]+)`/g, '<code style="background: rgba(255,255,255,0.08); padding: 0.15rem 0.35rem; border-radius: 4px; font-family: monospace;">$1</code>');
       // Line breaks
       safe = safe.replace(/\n/g, '<br>');
-      return safe;
+      return safe
+        .replace(/\uE001/g, '*').replace(/\uE002/g, '_').replace(/\uE003/g, '`')
+        .replace(/\uE004/g, '[').replace(/\uE005/g, ']').replace(/\uE000/g, '\\');
     }
 
     // TOAST NOTIFICATIONS
@@ -2710,25 +2772,68 @@ def create_web_server(
             self.send_response(status)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
+            self._send_security_headers()
             if headers:
                 for k, v in headers.items():
                     self.send_header(k, v)
             self.end_headers()
             self.wfile.write(data)
 
+        def _send_security_headers(self) -> None:
+            """Baseline hardening headers on every response.
+
+            The dashboard is a single embedded HTML blob with an inline <script>,
+            so a strict CSP cannot be applied without a nonce on the tag; these
+            cover the cheap, high-value cases instead. No CSP deliberately --
+            adding one that blocks the inline script would break the portal.
+            """
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+            self.send_header("Cache-Control", "no-store")
+
         def _send_json(self, data: Any, status: int = 200) -> None:
             body = json.dumps(data).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
+            self._send_security_headers()
+            if status == 413:
+                # Body was never consumed, so the connection is unusable.
+                self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(body)
 
+        def _client_key(self) -> str:
+            """Identify a client for throttling. Best-effort; no proxy trust."""
+            return self.client_address[0] if self.client_address else "unknown"
+
         def _read_json_body(self) -> Dict[str, Any]:
-            content_length = int(self.headers.get("Content-Length", 0))
-            if content_length == 0:
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+            except ValueError:
                 return {}
-            raw_data = self.rfile.read(content_length).decode("utf-8")
+            if content_length <= 0:
+                return {}
+            # Refuse oversized bodies before reading them: the agent runs under
+            # a 512M cgroup, and base64 image uploads decode to roughly 3x their
+            # encoded size, so an unbounded read is an OOM kill waiting to happen.
+            #
+            # Deliberately do NOT drain the socket here. Reading the declared
+            # length would block forever against a client that sent less, and
+            # draining a body this large defeats the purpose. Reply 413 and hang
+            # up instead.
+            if content_length > MAX_REQUEST_BYTES:
+                logger.warning(
+                    "Rejected %d byte body from %s (limit %d)",
+                    content_length, self._client_key(), MAX_REQUEST_BYTES
+                )
+                self.close_connection = True
+                raise _RequestTooLarge(
+                    f"Request body exceeds {MAX_REQUEST_BYTES} bytes"
+                )
+            raw_data = self.rfile.read(content_length).decode("utf-8", errors="replace")
             try:
                 return json.loads(raw_data)
             except Exception:
@@ -2872,13 +2977,32 @@ def create_web_server(
                 self.end_headers()
 
         def do_POST(self) -> None:
+            try:
+                self._route_post()
+            except _RequestTooLarge as e:
+                self._send_json({"error": str(e)}, status=413)
+
+        def _route_post(self) -> None:
             parsed = urllib.parse.urlparse(self.path)
             path = parsed.path
 
             if path == "/api/login":
+                client = self._client_key()
+                locked_for = _login_locked_out(client)
+                if locked_for > 0:
+                    logger.warning("Login throttled for %s (%.0fs remaining)", client, locked_for)
+                    self._send_json(
+                        {
+                            "error": "Too many failed attempts. Try again later.",
+                            "retry_after_sec": int(locked_for) + 1
+                        },
+                        status=429
+                    )
+                    return
                 body = self._read_json_body()
                 pwd = body.get("password", "")
-                if secrets.compare_digest(pwd, admin_password):
+                if isinstance(pwd, str) and secrets.compare_digest(pwd, admin_password):
+                    _clear_login_failures(client)
                     token = secrets.token_hex(24)
                     if storage:
                         storage.create_session(token, expires_in_sec=259200)
@@ -2889,6 +3013,17 @@ def create_web_server(
                         headers={"Set-Cookie": cookie, "Content-Type": "application/json"}
                     )
                 else:
+                    locked_for = _record_login_failure(client)
+                    if locked_for > 0:
+                        logger.warning("Login locked out for %s after repeated failures", client)
+                        self._send_json(
+                            {
+                                "error": "Too many failed attempts. Try again later.",
+                                "retry_after_sec": int(locked_for) + 1
+                            },
+                            status=429
+                        )
+                        return
                     self._send_json({"error": "Invalid passphrase"}, status=401)
                 return
 
@@ -3131,7 +3266,15 @@ def create_web_server(
                     from pithon.agent.briefing import generate_daily_briefing
                     reply_text = generate_daily_briefing(str(admin_id or "web"), storage, tz_name=tz_name)
 
-                # 0c. Check /calendar command
+                # 0c. Calendar subcommands (set/alert/sync), shared with Telegram.
+                # Must run before the bare listing below or `/calendar set <url>`
+                # would render meetings and silently discard the URL.
+                if not reply_text and prompt.strip().startswith(("/calendar", "/calender", "/agenda")):
+                    sub = handle_calendar_subcommand(prompt, storage, str(admin_id or "web"), tz_name)
+                    if sub is not None:
+                        reply_text, _sub_ctx = sub
+
+                # 0d. Check /calendar command
                 if not reply_text and (prompt.startswith("/calendar") or prompt.startswith("/agenda") or prompt.lower().strip() in ("/calendar", "my calendar", "today's agenda", "agenda")):
                     prof = (storage.get_user_profile("web") if storage else {}) or {}
                     cal_url = prof.get("calendar_url") or os.environ.get("CALENDAR_ICS_URL", "")
@@ -3230,6 +3373,19 @@ def create_web_server(
                             reply_text = f"🔍 No web results found for `{s_query}`."
                     else:
                         reply_text = "Usage: `/search <query>`"
+
+                # 4b. Deterministic intents this surface does not handle inline.
+                # Delegates to the shared router so the portal gains time,
+                # status, notes search, bare arithmetic, /timer and /notes
+                # without a second implementation drifting out of sync.
+                # reply_markup is Telegram-only and is dropped here.
+                if not reply_text:
+                    from pithon.agent.router import route_fast_path
+                    fast_res = route_fast_path(
+                        prompt, storage, str(admin_id or "web"), tz_name, admin_id
+                    )
+                    if fast_res:
+                        reply_text, _markup, _fast_ctx = fast_res
 
                 # 5. Fallback to conversational daemon query with multi-turn context
                 if not reply_text:

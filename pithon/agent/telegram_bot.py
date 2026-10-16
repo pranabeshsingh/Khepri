@@ -20,9 +20,10 @@ from pithon.agent.tasks import (
 )
 from pithon.agent.calc import safe_calculate
 from pithon.agent.weather import get_weather_report, is_weather_intent, extract_weather_location
-from pithon.agent.memory import list_notes, save_note
+from pithon.agent.memory import save_note
 from pithon.agent.briefing import generate_daily_briefing
-from pithon.agent.calendar import fetch_and_parse_calendar
+from pithon.agent.calendar import handle_calendar_subcommand
+from pithon.agent.markdown_escape import escape_markdown, escape_code
 from pithon.agent.profile import (
     start_onboarding,
     handle_onboarding_step,
@@ -78,16 +79,26 @@ class TelegramBot:
         text: str,
         reply_markup: Optional[Dict[str, Any]] = None,
         disable_notification: bool = False,
-        disable_web_page_preview: bool = False
+        disable_web_page_preview: bool = False,
+        parse_mode: Optional[str] = "Markdown"
     ) -> Optional[Dict[str, Any]]:
-        """Send a markdown message to a Telegram chat."""
+        """Send a message to a Telegram chat.
+
+        ``parse_mode`` defaults to legacy Markdown because every deterministic
+        reply in this codebase is hand-formatted for it. Pass ``None`` for text
+        the SLM generated: that output is not deliberately formatted, and one
+        unbalanced ``*`` in it makes Telegram reject the whole message with a
+        400, which would otherwise be swallowed by ``_call_api`` and look like
+        the model simply went quiet.
+        """
         payload: Dict[str, Any] = {
             "chat_id": chat_id,
             "text": text,
-            "parse_mode": "Markdown",
             "disable_web_page_preview": disable_web_page_preview,
             "disable_notification": disable_notification
         }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
         if reply_markup:
             payload["reply_markup"] = reply_markup
         return self._call_api("sendMessage", payload)
@@ -148,6 +159,8 @@ class TelegramBot:
         msg = cb.get("message", {})
         msg_id = msg.get("message_id")
         chat_id = msg.get("chat", {}).get("id")
+        # Already-escaped text this bot sent earlier. Re-escaping would double
+        # the backslashes, so it is appended verbatim -- entities included.
         current_text = msg.get("text", "")
 
         if data.startswith("done:"):
@@ -155,7 +168,9 @@ class TelegramBot:
             if self.storage:
                 self.storage.complete_task(tid)
             self.answer_callback_query(cb_id, text="Task marked complete! ✅")
-            updated_text = f"~~{current_text}~~\n\n✅ *Marked completed!*"
+            # No ~~strikethrough~~: that is MarkdownV2-only syntax and renders as
+            # literal tildes under parse_mode="Markdown" (the legacy dialect).
+            updated_text = f"{current_text}\n\n✅ *Marked completed!*"
             self.edit_message_text(chat_id, msg_id, updated_text, reply_markup={"inline_keyboard": []})
 
         elif data.startswith("cal_dismiss:"):
@@ -179,7 +194,7 @@ class TelegramBot:
             if self.storage:
                 self.storage.delete_task(tid)
             self.answer_callback_query(cb_id, text="Task deleted. 🗑️")
-            updated_text = f"~~{current_text}~~\n\n🗑️ *Deleted.*"
+            updated_text = f"{current_text}\n\n🗑️ *Deleted.*"
             self.edit_message_text(chat_id, msg_id, updated_text, reply_markup={"inline_keyboard": []})
 
         elif data == "menu:briefing":
@@ -320,7 +335,11 @@ class TelegramBot:
                 title = "Image OCR Note"
             from pithon.agent.memory import save_note
             saved = save_note(title, extracted_text, tags="ocr,image", tz_name=self.tz_name, base_dir=self.notes_dir)
-            self.send_message(chat_id, f"📝 *Saved Note from Image:*\nTitle: `{saved['title']}`\n\n```\n{extracted_text[:400]}\n```")
+            self.send_message(
+                chat_id,
+                f"📝 *Saved Note from Image:*\nTitle: `{saved['title']}`"
+                f"\n\n```\n{escape_code(extracted_text[:400])}\n```"
+            )
             return
 
         # If user asked a question about the image/error
@@ -332,14 +351,14 @@ class TelegramBot:
                 f"Please provide a concise, helpful technical response."
             )
             ans = self._query_daemon(prompt)
-            self.send_message(chat_id, ans)
+            self.send_message(chat_id, ans, parse_mode=None)
             return
 
         # If no caption, return clean OCR text
         if extracted_text and not extracted_text.startswith("ℹ️"):
             self.send_message(
                 chat_id,
-                f"🔍 *Extracted Text from Image:*\n\n```\n{extracted_text}\n```\n\n_Tip: Add a caption to ask a question or use `/pdf` to convert._"
+                f"🔍 *Extracted Text from Image:*\n\n```\n{escape_code(extracted_text)}\n```\n\n_Tip: Add a caption to ask a question or use `/pdf` to convert._"
             )
         else:
             self.send_message(chat_id, "ℹ️ No readable text detected in this image. Send with caption `/pdf` to convert to document.")
@@ -389,53 +408,12 @@ class TelegramBot:
 
         # Fast-path /calendar and /agenda
         if text.startswith(("/calendar", "/calender", "/agenda")):
-            parts = text.split()
-            cmd_arg = parts[1].lower() if len(parts) > 1 else ""
-
-            if cmd_arg == "set" and len(parts) > 2:
-                cal_url = parts[2].strip()
-                if not (cal_url.startswith("http://") or cal_url.startswith("https://") or cal_url.startswith("webcal://")):
-                    self.send_message(chat_id, "⚠️ Invalid URL. Must begin with `https://`, `http://`, or `webcal://`.")
-                    return
-                if self.storage:
-                    self.storage.update_calendar_settings(str(chat_id), url=cal_url)
-                # Immediate initial sync
-                changed, feed_md5, events = fetch_and_parse_calendar(cal_url, "", self.tz_name)
-                if self.storage:
-                    self.storage.save_calendar_events(str(chat_id), events)
-                    self.storage.update_calendar_settings(str(chat_id), feed_md5=feed_md5)
-                reply = (
-                    f"✅ *Calendar URL configured and synced!*\n\n"
-                    f"🔗 *Feed URL:* `{cal_url}`\n"
-                    f"📥 *Meetings parsed:* `{len(events)}` upcoming events found."
-                )
+            # Subcommands live in calendar.py so the portal shares one
+            # implementation; only the bare listing is rendered here.
+            sub = handle_calendar_subcommand(text, self.storage, str(chat_id), self.tz_name)
+            if sub is not None:
+                reply, _ctx = sub
                 self.send_message(chat_id, reply, disable_web_page_preview=True)
-                return
-
-            elif cmd_arg == "alert" and len(parts) > 2:
-                try:
-                    mins = int(parts[2].strip())
-                    if mins < 1 or mins > 120:
-                        raise ValueError()
-                except ValueError:
-                    self.send_message(chat_id, "⚠️ Please specify alert minutes between 1 and 120 (e.g. `/calendar alert 15`).")
-                    return
-                if self.storage:
-                    self.storage.update_calendar_settings(str(chat_id), alert_mins=mins)
-                self.send_message(chat_id, f"✅ *Meeting alert lead time updated to {mins} minutes before call.*")
-                return
-
-            elif cmd_arg == "sync":
-                prof = self.storage.get_user_profile(str(chat_id)) if self.storage else {}
-                cal_url = prof.get("calendar_url") or os.environ.get("CALENDAR_ICS_URL", "")
-                if not cal_url:
-                    self.send_message(chat_id, "⚠️ No calendar URL configured yet. Use `/calendar set <url>` to configure.")
-                    return
-                changed, feed_md5, events = fetch_and_parse_calendar(cal_url, "", self.tz_name)
-                if self.storage:
-                    self.storage.save_calendar_events(str(chat_id), events)
-                    self.storage.update_calendar_settings(str(chat_id), feed_md5=feed_md5)
-                self.send_message(chat_id, f"🔄 *Calendar synced!* Found `{len(events)}` upcoming meetings.")
                 return
 
             # Default: list upcoming meetings and settings
@@ -456,12 +434,13 @@ class TelegramBot:
                         ev_start = datetime.fromisoformat(ev["start_time"]).astimezone(tz)
                         ev_end = datetime.fromisoformat(ev["end_time"]).astimezone(tz)
                         t_str = f"{ev_start.strftime('%a %d %b, %I:%M %p')} - {ev_end.strftime('%I:%M %p')}"
-                        loc_str = f" _({ev['location']})_" if ev.get("location") else ""
+                        loc_str = f" _({escape_markdown(ev['location'])})_" if ev.get("location") else ""
                         link = ev.get("meeting_link")
+                        ev_title = escape_markdown(ev["title"])
                         if link:
-                            lines.append(f"• `{t_str}`\n  [{ev['title']}]({link}){loc_str}")
+                            lines.append(f"• `{t_str}`\n  [{ev_title}]({link}){loc_str}")
                         else:
-                            lines.append(f"• `{t_str}`\n  *{ev['title']}*{loc_str}")
+                            lines.append(f"• `{t_str}`\n  *{ev_title}*{loc_str}")
                     except Exception:
                         continue
             else:
@@ -552,7 +531,7 @@ class TelegramBot:
                 }
                 self.send_message(
                     chat_id,
-                    f"✅ Saved task *#{tid}*: {task_info['title']}{due_info}",
+                    f"✅ Saved task *#{tid}*: {escape_markdown(task_info['title'])}{due_info}",
                     reply_markup=reply_markup
                 )
             return
@@ -574,7 +553,7 @@ class TelegramBot:
                 }
                 msg_text = (
                     f"⏱️ *Timer Started!*\n\n"
-                    f"📌 *Timer:* {task_info['title']}\n"
+                    f"📌 *Timer:* {escape_markdown(task_info['title'])}\n"
                     f"🕒 *Alert at:* `{due_clean} {self.tz_name}`\n\n"
                     f"_I will alert you as soon as time is up!_"
                 )
@@ -608,7 +587,7 @@ class TelegramBot:
         if text.startswith("/calc "):
             expr = text[6:].strip()
             res = safe_calculate(expr)
-            self.send_message(chat_id, f"🧮 `{expr}` = *{res}*")
+            self.send_message(chat_id, f"🧮 `{escape_code(expr)}` = *{res}*")
             return
 
         if text.startswith("/weather"):
@@ -617,16 +596,8 @@ class TelegramBot:
             self.send_message(chat_id, report.get("summary", "No weather data."))
             return
 
-        if text.startswith("/notes"):
-            notes = list_notes(base_dir=self.notes_dir)
-            if not notes:
-                self.send_message(chat_id, "📝 No saved notes. Send 'Remember that...' or `/note <title> <text>` to save.")
-            else:
-                lines = ["📝 *Saved Markdown Notes:*\n"]
-                for n in notes:
-                    lines.append(f"• *{n['title']}* (`{n['filename']}`)")
-                self.send_message(chat_id, "\n".join(lines))
-            return
+        # /notes browse is handled by route_fast_path so the portal shares one
+        # implementation rather than keeping a divergent copy here.
 
         if text.startswith("/note "):
             body = text[6:].strip()
@@ -680,7 +651,7 @@ class TelegramBot:
             expr = text.strip()[calc_prefix.end():].rstrip("?").strip()
             if expr and re.fullmatch(r"[0-9\.\s\+\-\*\/\(\)\^\%]+", expr):
                 res = safe_calculate(expr)
-                ans = f"🧮 `{expr}` = *{res}*"
+                ans = f"🧮 `{escape_code(expr)}` = *{res}*"
                 if self.storage:
                     self.storage.log_interaction(
                         chat_id=str(chat_id),
@@ -741,7 +712,7 @@ class TelegramBot:
                         response=grounded_answer,
                         latency_ms=latency_ms
                     )
-                self.send_message(chat_id, grounded_answer, reply_markup=url_markup)
+                self.send_message(chat_id, grounded_answer, reply_markup=url_markup, parse_mode=None)
                 return
             else:
                 reply_text, reply_markup, ctx = execute_tool_call(tool_call, self.storage, str(chat_id), self.tz_name)
@@ -775,7 +746,7 @@ class TelegramBot:
                     }
                     msg_text = (
                         f"⏱️ *Timer Started!*\n\n"
-                        f"📌 *Timer:* {task_info['title']}\n"
+                        f"📌 *Timer:* {escape_markdown(task_info['title'])}\n"
                         f"🕒 *Alert at:* `{due_clean} {self.tz_name}`\n\n"
                         f"_I will alert you as soon as time is up!_"
                     )
@@ -817,7 +788,7 @@ class TelegramBot:
                     response=answer,
                     latency_ms=latency_ms
                 )
-            self.send_message(chat_id, answer, reply_markup=reply_markup)
+            self.send_message(chat_id, answer, reply_markup=reply_markup, parse_mode=None)
             return
 
         # 5. Direct conversational response
@@ -829,7 +800,7 @@ class TelegramBot:
                 response=answer,
                 latency_ms=latency_ms
             )
-        self.send_message(chat_id, answer)
+        self.send_message(chat_id, answer, parse_mode=None)
 
     def _query_daemon(
         self,

@@ -12,6 +12,7 @@ from pithon.agent.weather import get_weather_report
 from pithon.agent.memory import save_note, search_notes, list_notes
 from pithon.agent.search import search_duckduckgo, format_search_context
 from pithon.agent.tasks import format_tasks_message
+from pithon.agent.markdown_escape import escape_markdown, escape_code
 
 logger = logging.getLogger("pithon.tools")
 
@@ -276,7 +277,7 @@ def execute_tool_call(
                 [{"text": "❌ Cancel Timer", "callback_data": f"del:{tid}"}]
             ]
         }
-        msg = f"⏱️ *Timer set:* {label}\nAlert: `{due_clean} {tz_name}`"
+        msg = f"⏱️ *Timer set:* {escape_markdown(label)}\nAlert: `{due_clean} {tz_name}`"
         return msg, reply_markup, {"type": "timer", "task_id": tid, "seconds": total_secs}
 
     elif name == "add_task":
@@ -297,7 +298,7 @@ def execute_tool_call(
             ]
         }
         list_tag = f" `[{list_name}]`" if list_name != "default" else ""
-        msg = f"📌 Saved #{tid}: {title}{list_tag}"
+        msg = f"📌 Saved #{tid}: {escape_markdown(title)}{list_tag}"
         return msg, task_markup, {"type": "task", "task_id": tid}
 
     elif name == "list_tasks":
@@ -312,7 +313,7 @@ def execute_tool_call(
     elif name == "calculate":
         expr = str(args.get("expression", "")).strip()
         res = safe_calculate(expr)
-        msg = f"🧮 `{expr}` = *{res}*"
+        msg = f"🧮 `{escape_code(expr)}` = *{res}*"
         return msg, None, {"type": "calculate", "expression": expr, "result": res}
 
     elif name == "get_weather":
@@ -326,7 +327,10 @@ def execute_tool_call(
         content = str(args.get("content", "")).strip()
         note_res = save_note(title, content, tz_name=tz_name, base_dir=(storage.notes_dir() if storage else None))
         action_verb = "Updated" if note_res.get("updated") else "Saved"
-        msg = f"📝 *{action_verb} note:* `{note_res['filename']}`\n📌 *{title}*\n\n{content}"
+        msg = (
+            f"📝 *{action_verb} note:* `{note_res['filename']}`\n"
+            f"📌 *{escape_markdown(title)}*\n\n{escape_markdown(content)}"
+        )
         return msg, None, {"type": "note", "filename": note_res["filename"]}
 
     elif name == "search_notes":
@@ -335,13 +339,16 @@ def execute_tool_call(
         if not notes:
             all_n = list_notes(base_dir=(storage.notes_dir() if storage else None))
             if not all_n:
-                return f"No notes found matching '{query}'. Zero notes saved.", None, None
+                return f"No notes found matching '{escape_markdown(query)}'. Zero notes saved.", None, None
             titles = ", ".join(f"`{n['title']}`" for n in all_n[:5])
-            return f"No match for '{query}'. Existing notes: {titles}", None, None
+            return f"No match for '{escape_markdown(query)}'. Existing notes: {titles}", None, None
 
-        lines = [f"🔍 *Found {len(notes)} note(s) for '{query}':*\n"]
+        lines = [f"🔍 *Found {len(notes)} note(s) for '{escape_markdown(query)}':*\n"]
         for n in notes[:3]:
-            lines.append(f"• *{n['title']}* (`{n['filename']}`):\n{n['content'][:200]}...")
+            lines.append(
+                f"• *{escape_markdown(n['title'])}* (`{n['filename']}`):"
+                f"\n{escape_markdown(n['content'][:200])}..."
+            )
         msg = "\n\n".join(lines)
         return msg, None, {"type": "search_notes", "query": query, "results": notes}
 
@@ -395,11 +402,12 @@ def execute_tool_call(
             date_prefix = f"{ev_start.strftime('%a %d %b')} " if days > 1 else ""
             t_str = f"{date_prefix}{ev_start.strftime('%I:%M %p')} - {ev_end.strftime('%I:%M %p')}"
             link = ev.get("meeting_link")
-            loc = f" _({ev['location']})_" if ev.get("location") else ""
+            ev_title = escape_markdown(ev["title"])
+            loc = f" _({escape_markdown(ev['location'])})_" if ev.get("location") else ""
             if link:
-                lines.append(f"• `{t_str}` — [{ev['title']}]({link}){loc}")
+                lines.append(f"• `{t_str}` — [{ev_title}]({link}){loc}")
             else:
-                lines.append(f"• `{t_str}` — *{ev['title']}*{loc}")
+                lines.append(f"• `{t_str}` — *{ev_title}*{loc}")
 
         return "\n".join(lines), None, {"type": "calendar"}
 

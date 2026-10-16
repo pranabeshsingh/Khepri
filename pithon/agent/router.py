@@ -4,10 +4,11 @@ import re
 from typing import Dict, Any, Optional, Tuple
 
 from pithon.agent.calc import safe_calculate
-from pithon.agent.calendar import is_calendar_intent
+from pithon.agent.calendar import is_calendar_intent, handle_calendar_subcommand
 from pithon.agent.weather import is_weather_intent, extract_weather_location, get_weather_report
 from pithon.agent.time_context import get_current_time_info
-from pithon.agent.memory import search_notes
+from pithon.agent.memory import search_notes, list_notes
+from pithon.agent.markdown_escape import escape_markdown, escape_code
 from pithon.agent.tasks import parse_task_text
 from pithon.agent.tools import execute_tool_call
 
@@ -90,6 +91,14 @@ def route_fast_path(
 
     # 1. Calendar / Agenda Intent
     if is_calendar_intent(clean) or clean.startswith(("/calendar", "/calender", "/agenda")):
+        # Subcommands (set/alert/sync) mutate state, so they must win before the
+        # read-only event listing below -- otherwise `/calendar set <url>` would
+        # render a meeting list and silently drop the URL.
+        sub = handle_calendar_subcommand(clean, storage, str(chat_id), tz_name)
+        if sub is not None:
+            sub_text, sub_ctx = sub
+            return sub_text, None, sub_ctx
+
         days = 2 if "tomorrow" in clean.lower() else 1
         reply_text, reply_markup, ctx = execute_tool_call(
             {"name": "get_calendar_events", "arguments": {"days": days}},
@@ -125,21 +134,38 @@ def route_fast_path(
     expr = is_math_intent(clean)
     if expr:
         calc_res = safe_calculate(expr)
-        reply = f"🧮 *Result:*\n`{expr}` = `{calc_res}`"
+        reply = f"🧮 *Result:*\n`{escape_code(expr)}` = `{calc_res}`"
         return reply, None, {"type": "calc", "expression": expr, "result": calc_res}
 
     # 5. Notes Search Intent
     search_q = is_notes_search_intent(clean)
     if search_q:
         results = search_notes(search_q, base_dir=(storage.notes_dir() if storage else None))
+        safe_q = escape_markdown(search_q)
         if not results:
-            reply = f"📝 No saved notes matching *'{search_q}'*."
+            reply = f"📝 No saved notes matching *'{safe_q}'*."
         else:
-            lines = [f"📝 *Saved Notes Matching '{search_q}':*\n"]
+            lines = [f"📝 *Saved Notes Matching '{safe_q}':*\n"]
             for r in results[:5]:
-                lines.append(f"• *{r['title']}* (`{r['filename']}`)\n  {r['content'][:140]}...")
+                lines.append(
+                    f"• *{escape_markdown(r['title'])}* (`{r['filename']}`)"
+                    f"\n  {escape_markdown(r['content'][:140])}..."
+                )
             reply = "\n".join(lines)
         return reply, None, {"type": "notes", "query": search_q}
+
+    # 5b. /notes browse (list the vault). Lives here so the portal gets it too;
+    # it is distinct from the search intent above, which requires a query term.
+    if clean.lower().startswith(("/notes", "/notes ")):
+        notes = list_notes(base_dir=(storage.notes_dir() if storage else None))
+        if not notes:
+            reply = "📝 No saved notes. Send 'Remember that...' or `/note <title> <text>` to save."
+        else:
+            lines = ["📝 *Saved Markdown Notes:*\n"]
+            for n in notes:
+                lines.append(f"• *{escape_markdown(n['title'])}* (`{n['filename']}`)")
+            reply = "\n".join(lines)
+        return reply, None, {"type": "notes", "count": len(notes)}
 
     # 6. System Status Intent
     if is_status_intent(clean):
@@ -167,13 +193,14 @@ def route_fast_path(
                 due_at=task_info["due_at"]
             )
             due_clean = task_info["due_at"][:19].replace("T", " ") if task_info.get("due_at") else ""
+            safe_title = escape_markdown(task_info["title"])
             if task_info.get("is_timer"):
                 secs = task_info.get("seconds", 0)
                 dur = f"{secs // 60}m" if secs >= 60 else f"{secs}s"
-                reply = f"⏱️ *Timer set:* '{task_info['title']}' for *{dur}* (Alert at `{due_clean}`)."
+                reply = f"⏱️ *Timer set:* '{safe_title}' for *{dur}* (Alert at `{due_clean}`)."
                 reply_markup = {"inline_keyboard": [[{"text": "❌ Cancel Timer", "callback_data": f"del:{tid}"}]]}
             else:
-                reply = f"📋 *Task created:* '{task_info['title']}' (Due: `{due_clean}`)."
+                reply = f"📋 *Task created:* '{safe_title}' (Due: `{due_clean}`)."
                 reply_markup = {"inline_keyboard": [[{"text": "✅ Done", "callback_data": f"done:{tid}"}]]}
             return reply, reply_markup, {"type": "task", "id": tid}
 

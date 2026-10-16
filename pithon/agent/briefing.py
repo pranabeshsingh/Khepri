@@ -17,6 +17,7 @@ import zoneinfo
 from typing import Any, List, Optional
 
 from pithon.agent.facts import get_interesting_fact_today, get_thought_of_the_day
+from pithon.agent.markdown_escape import escape_markdown
 from pithon.agent.news import fetch_news_headlines, format_news_section
 from pithon.agent.weather import get_weather_report
 
@@ -73,20 +74,20 @@ def generate_daily_briefing(
     sections: List[str] = []
 
     # Header
-    name_str = f", {user_name}!" if user_name != "there" else "!"
+    name_str = f", {escape_markdown(user_name)}!" if user_name != "there" else "!"
     header_line = f"{greeting}{name_str}\n📅 *{date_str}* • `{time_str}`"
     sections.append(header_line)
 
     # Focus tag if present
     if focus:
-        sections.append(f"🎯 *Daily Focus:* _{focus}_")
+        sections.append(f"🎯 *Daily Focus:* _{escape_markdown(focus)}_")
 
     # 2. Weather
     try:
         w_data = get_weather_report(search_city)
         w_summary = w_data.get("summary", "").strip()
         if w_summary:
-            sections.append(f"🌤️ *Weather ({search_city}):*\n{w_summary}")
+            sections.append(f"🌤️ *Weather ({escape_markdown(search_city)}):*\n{w_summary}")
     except Exception as e:
         logger.warning(f"Failed to fetch weather for briefing: {e}")
 
@@ -113,11 +114,12 @@ def generate_daily_briefing(
                 for ev_dt, ev in today_events:
                     ev_end = datetime.fromisoformat(ev["end_time"]).astimezone(tz)
                     time_range = f"{ev_dt.strftime('%I:%M %p')} - {ev_end.strftime('%I:%M %p')}"
-                    loc_str = f" _({ev['location']})_" if ev.get("location") else ""
+                    loc_str = f" _({escape_markdown(ev['location'])})_" if ev.get("location") else ""
+                    ev_title = escape_markdown(ev["title"])
                     if ev.get("meeting_link"):
-                        cal_lines.append(f"• `{time_range}` — [{ev['title']}]({ev['meeting_link']}){loc_str}")
+                        cal_lines.append(f"• `{time_range}` — [{ev_title}]({ev['meeting_link']}){loc_str}")
                     else:
-                        cal_lines.append(f"• `{time_range}` — *{ev['title']}*{loc_str}")
+                        cal_lines.append(f"• `{time_range}` — *{ev_title}*{loc_str}")
                 sections.append("\n".join(cal_lines))
             else:
                 sections.append("📅 *Today's Agenda:\n• No calls scheduled for today ✨*")
@@ -137,7 +139,7 @@ def generate_daily_briefing(
                     due_tag = ""
                     if t.get("due_at"):
                         due_tag = f" _(Due: {t['due_at'][:16].replace('T', ' ')})_"
-                    t_lines.append(f"• #{t['id']} {t['title']}{due_tag}")
+                    t_lines.append(f"• #{t['id']} {escape_markdown(t['title'])}{due_tag}")
                 if len(tasks) > 4:
                     t_lines.append(f"_...and {len(tasks) - 4} more task(s)_")
                 sections.append("\n".join(t_lines))

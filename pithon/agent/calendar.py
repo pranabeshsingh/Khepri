@@ -6,6 +6,7 @@ Zero external dependencies: uses Python standard library only.
 from datetime import datetime, time, timedelta, timezone
 import hashlib
 import logging
+import os
 import re
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import urllib.request
@@ -528,6 +529,85 @@ def fetch_and_parse_calendar(
 
     events = parse_ics_feed(content_text, default_tz=tz_name, expand_window=expand_window)
     return True, new_feed_md5, events
+
+def handle_calendar_subcommand(
+    text: str,
+    storage: Any,
+    chat_id: str,
+    tz_name: str = "Asia/Kolkata"
+) -> Optional[Tuple[str, Dict[str, Any]]]:
+    """Execute a ``/calendar set|alert|sync`` subcommand.
+
+    Returns ``(reply_text, tool_context)`` when the text was a recognised
+    subcommand, or ``None`` when it is a bare ``/calendar``/``/agenda`` request
+    and the caller should fall through to rendering the event list.
+
+    Lives here rather than in the Telegram bot because the web portal needs the
+    identical behaviour: both surfaces must share one implementation or they
+    silently drift, which is how ``/calendar set <url>`` used to be swallowed
+    by the portal's inline handler.
+    """
+    parts = text.strip().split()
+    if not parts or not parts[0].lower().startswith(("/calendar", "/calender", "/agenda")):
+        return None
+    sub = parts[1].lower() if len(parts) > 1 else ""
+
+    if sub == "set" and len(parts) > 2:
+        cal_url = parts[2].strip()
+        if not cal_url.startswith(("http://", "https://", "webcal://")):
+            return (
+                "⚠️ Invalid URL. Must begin with `https://`, `http://`, or `webcal://`.",
+                {"type": "calendar", "ok": False},
+            )
+        if storage:
+            storage.update_calendar_settings(chat_id, url=cal_url)
+        _, feed_md5, events = fetch_and_parse_calendar(cal_url, "", tz_name)
+        if storage:
+            storage.save_calendar_events(chat_id, events)
+            storage.update_calendar_settings(chat_id, feed_md5=feed_md5)
+        return (
+            f"✅ *Calendar URL configured and synced!*\n\n"
+            f"🔗 *Feed URL:* `{cal_url}`\n"
+            f"📥 *Meetings parsed:* `{len(events)}` upcoming events found.",
+            {"type": "calendar", "configured": True, "events": len(events)},
+        )
+
+    if sub == "alert" and len(parts) > 2:
+        try:
+            mins = int(parts[2].strip())
+            if mins < 1 or mins > 120:
+                raise ValueError
+        except ValueError:
+            return (
+                "⚠️ Please specify alert minutes between 1 and 120 (e.g. `/calendar alert 15`).",
+                {"type": "calendar", "ok": False},
+            )
+        if storage:
+            storage.update_calendar_settings(chat_id, alert_mins=mins)
+        return (
+            f"✅ *Meeting alert lead time updated to {mins} minutes before call.*",
+            {"type": "calendar", "alert_mins": mins},
+        )
+
+    if sub == "sync":
+        prof = storage.get_user_profile(chat_id) if storage else {}
+        cal_url = prof.get("calendar_url") or os.environ.get("CALENDAR_ICS_URL", "")
+        if not cal_url:
+            return (
+                "⚠️ No calendar URL configured yet. Use `/calendar set <url>` to configure.",
+                {"type": "calendar", "ok": False},
+            )
+        _, feed_md5, events = fetch_and_parse_calendar(cal_url, "", tz_name)
+        if storage:
+            storage.save_calendar_events(chat_id, events)
+            storage.update_calendar_settings(chat_id, feed_md5=feed_md5)
+        return (
+            f"🔄 *Calendar synced!* Found `{len(events)}` upcoming meetings.",
+            {"type": "calendar", "synced": True, "events": len(events)},
+        )
+
+    return None
+
 
 def is_calendar_intent(text: str) -> bool:
     """Detect if a user prompt is asking about their calendar, agenda, calls, or meetings."""

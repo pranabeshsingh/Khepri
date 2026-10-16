@@ -9,6 +9,7 @@ from typing import Any, Optional
 
 import os
 from pithon.agent.calendar import fetch_and_parse_calendar
+from pithon.agent.markdown_escape import escape_markdown
 from pithon.agent.tasks import format_reminder_alert
 
 logger = logging.getLogger("pithon.scheduler")
@@ -204,8 +205,8 @@ class Scheduler:
                 time_str = f"{local_start.strftime('%I:%M %p')} - {local_end.strftime('%I:%M %p')}"
                 mins_until = max(1, int((ev_start - now).total_seconds() / 60))
 
-                title = ev.get("title", "Upcoming Meeting")
-                location = ev.get("location") or "Online Meeting"
+                title = escape_markdown(ev.get("title") or "Upcoming Meeting")
+                location = escape_markdown(ev.get("location") or "Online Meeting")
                 link = ev.get("meeting_link")
 
                 min_label = f"{mins_until} mins" if mins_until > 1 else "1 min"
@@ -243,15 +244,30 @@ class Scheduler:
         now_local = datetime.now(tz)
         yesterday = (now_local - timedelta(days=1)).strftime("%Y-%m-%d")
 
-        # Query interactions from yesterday
-        history = self.storage.get_recent_history(limit=50, chat_id=self.admin_chat_id)
+        # Scope strictly to yesterday. get_recent_history returns the most
+        # recent N turns regardless of date, so without this window a quiet day
+        # would re-summarize (and overwrite the note for) the previous day's
+        # conversations under yesterday's heading.
+        #
+        # created_at is stored in UTC by SQLite's CURRENT_TIMESTAMP, so the
+        # boundaries are converted from local midnight before querying.
+        day_start_utc = (now_local - timedelta(days=1)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ).astimezone(timezone.utc)
+        day_end_utc = day_start_utc + timedelta(days=1)
+        history = self.storage.get_interactions_since(
+            day_start_utc.strftime("%Y-%m-%d %H:%M:%S"),
+            day_end_utc.strftime("%Y-%m-%d %H:%M:%S"),
+            chat_id=self.admin_chat_id
+        )
         if not history:
+            logger.info("Memory compactor: no interactions recorded on %s, skipping.", yesterday)
             return None
 
         # Filter out noisy or trivial single-word commands
         meaningful = []
         for h in history:
-            text = h.get("content", "").strip()
+            text = (h.get("prompt") or h.get("content") or "").strip()
             if text and not text.startswith(("/", "time", "weather", "cal")):
                 meaningful.append(text)
 
@@ -286,13 +302,22 @@ class Scheduler:
         now_local = datetime.now(tz)
         today_str = now_local.strftime("%A, %d %B")
 
-        # Tasks stats
+        # Tasks stats. completed_at is stamped in UTC (SQLite CURRENT_TIMESTAMP),
+        # so the day window has to be built in UTC too -- slicing local midnight
+        # against UTC timestamps would miscount every evening.
         completed_today = 0
         pending_tasks = []
         if self.storage:
-            all_tasks = self.storage.get_tasks(self.admin_chat_id, include_completed=True)
-            pending_tasks = [t for t in all_tasks if not t.get("is_completed")]
-            completed_today = len([t for t in all_tasks if t.get("is_completed")])
+            pending_tasks = self.storage.get_tasks(self.admin_chat_id, include_completed=False)
+            day_start_utc = now_local.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            ).astimezone(timezone.utc)
+            day_end_utc = day_start_utc + timedelta(days=1)
+            completed_today = self.storage.count_tasks_completed_between(
+                day_start_utc.strftime("%Y-%m-%d %H:%M:%S"),
+                day_end_utc.strftime("%Y-%m-%d %H:%M:%S"),
+                chat_id=self.admin_chat_id
+            )
 
         # Tomorrow's meetings
         tomorrow_start = (now_local + timedelta(days=1)).replace(hour=0, minute=0, second=0).astimezone(timezone.utc).isoformat()

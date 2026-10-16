@@ -5,6 +5,8 @@ from datetime import datetime, timedelta, timezone
 import zoneinfo
 from typing import Dict, Any, List, Tuple
 
+from pithon.agent.markdown_escape import escape_markdown
+
 TASK_INTENT_PATTERNS = [
     r"^/add\b",
     r"^/todo\b",
@@ -115,7 +117,7 @@ def format_tasks_message(tasks: List[Dict[str, Any]]) -> Tuple[str, List[List[Di
 
     for t in tasks:
         tid = t["id"]
-        title = t["title"]
+        title = escape_markdown(t["title"])
         due_str = ""
         if t.get("due_at"):
             due_clean = t["due_at"][:16].replace("T", " ")
@@ -136,8 +138,8 @@ def format_tasks_message(tasks: List[Dict[str, Any]]) -> Tuple[str, List[List[Di
 def format_reminder_alert(task: Dict[str, Any]) -> Tuple[str, List[List[Dict[str, str]]]]:
     """Format a scheduled reminder or timer alert for Telegram."""
     tid = task["id"]
-    title = task["title"]
-    is_timer = "timer" in title.lower()
+    title = escape_markdown(task["title"])
+    is_timer = "timer" in task["title"].lower()
 
     if is_timer:
         msg = (

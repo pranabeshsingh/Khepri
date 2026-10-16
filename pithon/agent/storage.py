@@ -55,6 +55,7 @@ class Storage:
                 due_at TIMESTAMP NULL,
                 is_completed BOOLEAN DEFAULT 0,
                 reminded BOOLEAN DEFAULT 0,
+                completed_at TIMESTAMP NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_at, is_completed, reminded);
@@ -116,6 +117,12 @@ class Storage:
             """)
 
             # Ensure calendar migration columns exist in existing user_profiles tables
+            task_cols = [col["name"] for col in conn.execute("PRAGMA table_info(tasks);").fetchall()]
+            if "completed_at" not in task_cols:
+                # Required to answer "completed today" accurately; pre-existing
+                # rows stay NULL, i.e. "completed at an unknown time".
+                conn.execute("ALTER TABLE tasks ADD COLUMN completed_at TIMESTAMP NULL;")
+
             cols = [col["name"] for col in conn.execute("PRAGMA table_info(user_profiles);").fetchall()]
             if "calendar_url" not in cols:
                 conn.execute("ALTER TABLE user_profiles ADD COLUMN calendar_url TEXT DEFAULT '';")
@@ -270,6 +277,36 @@ class Storage:
                 history.append({"role": "assistant", "content": r_text})
             return history
 
+    def get_interactions_since(
+        self,
+        start_iso: str,
+        end_iso: str,
+        chat_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Retrieve interactions recorded in the [start_iso, end_iso) window.
+
+        Bounds use SQLite's CURRENT_TIMESTAMP format
+        ('YYYY-MM-DD HH:MM:SS', always UTC). Unlike get_recent_history, which
+        returns the newest N rows regardless of age, this is a true date filter,
+        so a scheduled job summarising "yesterday" cannot pick up today's turns.
+        """
+        with self._lock, self._get_connection() as conn:
+            conditions = ["created_at >= ?", "created_at < ?", "prompt != ''"]
+            params: List[Any] = [start_iso, end_iso]
+            if chat_id:
+                conditions.append("(chat_id = ? OR chat_id = 'web' OR user_id = 'web')")
+                params.append(str(chat_id).strip())
+            rows = conn.execute(
+                f"""
+                SELECT id, chat_id, user_id, prompt, response, created_at
+                FROM interactions
+                WHERE {' AND '.join(conditions)}
+                ORDER BY id ASC
+                """,
+                params
+            ).fetchall()
+            return [dict(r) for r in rows]
+
     def get_chat_stream(
         self,
         limit: int = 40,
@@ -371,16 +408,61 @@ class Storage:
             if not row:
                 return None
             new_state = 0 if row["is_completed"] else 1
-            conn.execute("UPDATE tasks SET is_completed = ? WHERE id = ?", (new_state, task_id))
+            # Stamp (or clear) completed_at alongside the flag so
+            # "completed today" can be answered without scanning all-time rows.
+            if new_state:
+                conn.execute(
+                    "UPDATE tasks SET is_completed = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (new_state, task_id)
+                )
+            else:
+                conn.execute(
+                    "UPDATE tasks SET is_completed = ?, completed_at = NULL WHERE id = ?",
+                    (new_state, task_id)
+                )
         self._sync_tasks_markdown()
         return bool(new_state)
 
     def complete_task(self, task_id: int) -> bool:
         """Mark task as completed."""
         with self._lock, self._get_connection() as conn:
-            cursor = conn.execute("UPDATE tasks SET is_completed = 1 WHERE id = ?", (task_id,))
+            cursor = conn.execute(
+                "UPDATE tasks SET is_completed = 1, completed_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (task_id,)
+            )
         self._sync_tasks_markdown()
         return int(cursor.rowcount or 0) > 0
+
+    def count_tasks_completed_between(
+        self,
+        start_iso: str,
+        end_iso: str,
+        chat_id: Optional[str] = None
+    ) -> int:
+        """Count tasks completed within an inclusive [start_iso, end_iso) window.
+
+        Bounds are compared against SQLite's own CURRENT_TIMESTAMP format
+        ('YYYY-MM-DD HH:MM:SS', always UTC), which is what completed_at stores.
+        Rows completed before this column existed have a NULL completed_at and
+        are deliberately not counted as "completed today".
+        """
+        with self._lock, self._get_connection() as conn:
+            conditions = [
+                "is_completed = 1",
+                "completed_at IS NOT NULL",
+                "completed_at >= ?",
+                "completed_at < ?",
+            ]
+            params: List[Any] = [start_iso, end_iso]
+            if chat_id:
+                conditions.append("chat_id = ?")
+                params.append(str(chat_id).strip())
+            cursor = conn.execute(
+                f"SELECT COUNT(*) AS n FROM tasks WHERE {' AND '.join(conditions)}",
+                params
+            )
+            row = cursor.fetchone()
+            return int(row["n"]) if row else 0
 
     def delete_task(self, task_id: int) -> bool:
         """Delete task permanently."""

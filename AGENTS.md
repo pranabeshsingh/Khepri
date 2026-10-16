@@ -134,9 +134,42 @@ Adding a new intent to `router.py` alone means the portal silently falls through
 bug will look like a *model* problem rather than a routing one. Both surfaces are required, so change
 both, and extend both test files (`tests/test_agent_router.py`, `tests/test_agent_web.py`).
 
+`/api/chat/send` now ends its inline chain with a `route_fast_path` delegation (step 4b in `web.py`), so
+intents that portal never handled inline — time, status, notes search, bare arithmetic, `/timer`,
+`/notes` — arrive on both surfaces. **Prefer adding new intents to `router.py`**; anything added to
+the portal's inline chain before step 4b will shadow `route_fast_path` and re-create the drift.
+`reply_markup` is Telegram-only and the portal discards it.
+
+The `/calendar set|alert|sync` subcommands were the worst instance of this drift (the portal matched
+`startswith("/calendar")` and silently dropped the URL). They now live in
+`calendar.handle_calendar_subcommand()` and are called by both surfaces — keep it that way rather than
+re-inlining them.
+
 New agent tools need three edits: a schema entry in `tools.TOOLS_DEFINITIONS`, an alias/normalization
 branch in `tools.execute_tool_call` (it strips non-alphanumerics and maps `calender`/`agenda`/`todo`/
 `timer` typos), and an `elif name == ...` branch in the same function.
+
+## Telegram messages are legacy Markdown, and user text must be escaped
+
+Every outbound bot message uses `parse_mode="Markdown"` — the **legacy** dialect, which supports
+`*bold*`, `_italic_`, `` `code` ``, ```` ```pre``` ````, and `[text](url)`. Two consequences:
+
+- **`~~strikethrough~~` does not exist here.** It is MarkdownV2-only and renders as literal tildes.
+- **Anything user-controlled must go through `markdown_escape.escape_markdown()`** before
+  interpolation — task titles, note titles/bodies, search queries, calendar event titles/locations,
+  RSS headlines, and wttr.in output. Telegram answers an unbalanced marker with HTTP 400 "can't parse
+  entities", and `TelegramBot._call_api` swallows it and returns `None`, so the command fails
+  **silently**. Use `escape_code()` for payloads placed inside a code span, which only needs
+  backtick-run neutralisation.
+
+**SLM output is sent with `parse_mode=None`.** A 0.5B model reliably emits a stray `*`; sending that
+through the Markdown parser is what makes the bot "go quiet" on conversational replies. Pass
+`parse_mode=None` on any call site that forwards `self._query_daemon(...)` output.
+
+`web.py`'s `formatMarkdown()` mirrors these escapes: it lifts `\[` sequences into private-use
+sentinels before running its entity replacements and restores them afterwards, so a task titled
+`2 * 3 review` shows as `2 * 3 review` in the portal and renders bold-free in Telegram. If you add a
+character to `escape_markdown`, add it to that sentinel map too.
 
 ## State: SQLite is authoritative, markdown is a one-way mirror
 

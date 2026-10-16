@@ -120,7 +120,13 @@ search - Search web results via DuckDuckGo
 status - View system and inference health
 poll - Create an interactive group poll
 chat - Query local 0.5B AI model
+pdf - Convert an attached photo into a PDF document
+compress - Compress an attached photo to WebP
 ```
+
+> `/pdf` and `/compress` are **caption** commands, not standalone text commands — attach a photo and
+> put `/pdf` in the caption. BotFather still needs them listed so they show up in the Telegram
+> command menu.
 
 </details>
 
@@ -148,15 +154,15 @@ Send any photo directly to Khepri on Telegram:
 * **Whiteboard & Document Digitization:** Send a photo with caption `/note Architecture Draft` ➔ Khepri extracts the text and creates `data/notes/architecture-draft.md`.
 * **Image to PDF (`/pdf`):** Convert photos into clean, downloadable PDF documents.
 * **Image Compression (`/compress`):** Automatically resizes and compresses oversized images to lightweight WebP format.
-* **4GB Pi 4 Vision Architecture:** Engineered to use lightweight C++ Tesseract OCR (~20MB RAM) and SmolVLM-500M, ensuring total system memory never exceeds the 4GB Raspberry Pi 4 budget.
+* **Edge-safe vision architecture:** "Vision" here is OCR + reasoning, not a multimodal model. Khepri runs local OCR (Tesseract, ~20MB RSS) to pull text out of the photo, then feeds that text to the 0.5B SLM. The daemon serves a **text-only** GGUF with no multimodal projector, so there is no image-understanding path — see the note in `pithon/agent/image_tools.py`. Adding a real VLM means shipping a `mmproj` GGUF and first proving it fits inside the <2GB budget.
 
 ### 🧠 Hybrid Markdown Memory Architecture
 Instead of storing all user data in an opaque binary database, Khepri employs an open, human-readable file structure in `data/`:
-* `data/profile.md`: User persona, communication style, and settings in YAML frontmatter + Markdown body (directly editable in nano or Obsidian).
-* `data/tasks.md`: Standard GitHub-flavored `- [ ]` checklist synchronized bidirectionally with Telegram and the Web UI.
-* `data/notes/*.md`: Persistent knowledge vault and documentation.
+* `data/profile.md`: User persona, communication style, and settings in YAML frontmatter + Markdown body.
+* `data/tasks.md`: GitHub-flavored `- [ ]` checklist **regenerated from** SQLite on every task mutation. This is output, not input — hand edits are overwritten by the next change, so make task edits through Telegram or the portal.
+* `data/notes/*.md`: Persistent knowledge vault and documentation. This is the authoritative store for notes.
 * `data/briefings/*.md`: Archived historical record of every morning and evening briefing.
-* `pithon.db`: Lightweight SQLite retained exclusively for high-frequency calendar alert queries and session tokens.
+* `pithon.db`: Authoritative SQLite store for tasks, interactions, sessions, calendar events, and profile rows. The markdown files above are mirrors or archives, not the source of truth.
 
 ### 🔄 Automated Lifecycle & Memory Compactor
 * **05:00 AM — Nightly Memory Compactor:** Background cron job reviews the previous day's conversations, extracts key technical decisions and user preferences, and writes a structured summary into `data/notes/daily_summary_YYYY-MM-DD.md`.
@@ -298,12 +304,18 @@ curl http://127.0.0.1:8091/         # Web portal (login required)
 ## Testing & Quality Assurance
 
 ```bash
-# Run unit and security test suite (80+ tests)
-pytest tests/ -m "not e2e" -v
+# Run unit and security test suite
+.venv/bin/python -m pytest tests/ -m "not e2e" -q
 
-# Run linting check
-ruff check pithon tests
+# Type check and lint
+.venv/bin/python -m mypy pithon
+.venv/bin/ruff check pithon tests
 ```
+
+> **Note:** run these through `.venv/bin/python -m ...`, not `.venv/bin/pytest`. The venv was created
+> before the repo was renamed from `Pithon` to `Khepri`, so every console script in `.venv/bin` still
+> has a shebang pointing at the old path and fails with `bad interpreter`. `ruff` is a standalone
+> binary with no such issue.
 
 ---
 
