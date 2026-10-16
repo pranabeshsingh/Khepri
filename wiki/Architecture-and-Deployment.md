@@ -29,7 +29,61 @@ Khepri is engineered from the ground up for strict resource budgeting on ARM edg
 
 ---
 
-## 2. 4GB Raspberry Pi 4 Edge Memory Budget
+## 2. Deployment Options
+
+Khepri runs as **two processes** under both supported paths: the SLM daemon, and the agent (Telegram bot +
+scheduler + web portal). The agent never loads the model — it reaches the daemon over loopback HTTP.
+
+### Option A — Docker Compose (recommended default)
+
+| Container | Role | Host Binding |
+| :--- | :--- | :--- |
+| `pithon` | llama.cpp SLM daemon | `127.0.0.1:8090` |
+| `pithon-agent` | Telegram bot + scheduler + web portal | `127.0.0.1:8091` |
+
+```bash
+cp .env.example .env && nano .env    # TELEGRAM_BOT_TOKEN, WEB_ADMIN_PASSWORD, TIMEZONE
+docker compose up -d --build
+```
+
+The daemon downloads the default Qwen2.5-0.5B GGUF (~350 MB) on first start.
+
+### Option B — Bare metal + systemd
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install --prefer-binary --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu -e .[dev]
+./scripts/download_model.sh qwen models
+```
+
+Because the daemon and agent are separate processes, Khepri ships **two** units:
+
+```bash
+# Edit User= and the /home/<you>/code/Khepri paths in BOTH units first.
+chmod 600 .env                        # the agent loads .env relative to WorkingDirectory
+sudo cp scripts/pithon-daemon.service scripts/pithon-agent.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now pithon-daemon.service
+sudo systemctl enable --now pithon-agent.service
+```
+
+> **Port caveat:** the shipped units serve the daemon on **8090** (matching Compose and
+> `scripts/query_daemon.sh`), not the `khepri serve` default of 8080. The agent unit sets
+> `PITHON_DAEMON_URL=http://127.0.0.1:8090` to match — change both together if you prefer 8080.
+
+`scripts/pithon.service` is a superseded single unit kept for reference only; do not enable it.
+
+### Verifying Any Deployment
+
+```bash
+curl http://127.0.0.1:8090/health     # daemon: {"status":"ok","model":...}
+curl http://127.0.0.1:8091/           # web portal (login required)
+./scripts/query_daemon.sh "hello"     # streamed completion straight from the daemon
+```
+
+---
+
+## 3. 4GB Raspberry Pi 4/5 Edge Memory Budget
 
 When co-located alongside mission-critical services like **OwnTracks Recorder**, **Mosquitto MQTT**, or system databases, Khepri enforces hard Linux cgroup constraints:
 
@@ -48,7 +102,7 @@ When co-located alongside mission-critical services like **OwnTracks Recorder**,
 
 ---
 
-## 3. Hybrid Markdown Memory Filesystem Layout
+## 4. Hybrid Markdown Memory Filesystem Layout
 
 ```
 data/
@@ -66,7 +120,7 @@ All markdown stores implement thread-level locking and atomic filesystem writes 
 
 ---
 
-## 4. Automated Lifecycle Schedulers
+## 5. Automated Lifecycle Schedulers
 
 * **05:00 AM — Memory Compactor:** Consolidates daily conversation turns into `data/notes/daily_summary_YYYY-MM-DD.md`.
 * **09:00 AM — Daily Briefing:** Weather, news headlines, historical milestones, quote, agenda, and pending tasks.
@@ -76,9 +130,9 @@ All markdown stores implement thread-level locking and atomic filesystem writes 
 
 ---
 
-## 5. Supported Model Weights
+## 6. Supported Model Weights
 
-| Model | Parameters | Quantization | Size on Disk | Typical Inference RAM | Speed on Cortex-A72 |
+| Model | Parameters | Quantization | Size on Disk | Typical Inference RAM | Speed on Cortex-A72 (Pi 4) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Qwen2.5-0.5B-Instruct** *(Default)* | 0.49B | `Q4_K_M` | 352 MB | ~306 MB | 10-14 tokens/sec |
 | **SmolLM2-135M-Instruct** | 0.13B | `Q4_K_M` | 98 MB | ~180 MB | 24-32 tokens/sec |
