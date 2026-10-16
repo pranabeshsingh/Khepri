@@ -68,7 +68,7 @@ Send any photo directly to Khepri on Telegram:
 * **Whiteboard & Document Digitization:** Send a photo with caption `/note Architecture Draft` ➔ Khepri extracts the handwritten or printed text and writes `data/notes/architecture-draft.md`.
 * **Image to PDF (`/pdf`):** Convert photos into clean, downloadable PDF documents in <15ms.
 * **Image Compression (`/compress`):** Automatically resizes and compresses oversized photos into lightweight WebP format.
-* **4GB Pi 4 Vision Architecture:** Engineered using lightweight Tesseract OCR (~20MB RAM) and SmolVLM-500M hooks, ensuring total system memory never exceeds the 4GB Raspberry Pi 4 budget.
+* **4GB Pi 4/5 Vision Architecture:** Engineered using lightweight Tesseract OCR (~20MB RAM) and SmolVLM-500M hooks, ensuring total system memory never exceeds the 4GB Raspberry Pi 4/5 budget.
 
 ---
 

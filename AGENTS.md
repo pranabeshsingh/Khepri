@@ -141,6 +141,11 @@ branch in `tools.execute_tool_call` (it strips non-alphanumerics and maps `calen
 - `data/tasks.md` and `data/profile.md` are **regenerated from SQLite** by `Storage._sync_tasks_markdown()`
   and `Storage.save_user_profile()`. Hand-edits are silently overwritten. They are output, not input.
 - `data/notes/*.md` **is** the real store for notes (`agent/memory.py`).
+- `Storage.__init__` calls `memory.seed_notes()`, which writes `system-specs.md` **only when the notes
+  vault is empty**. `data/` is gitignored, so authored notes never travel with the repo — that's why the
+  shipped cgroup figures live in an embedded `SEED_NOTES` constant in `memory.py` (an `assets/` dir would
+  work locally but breaks Docker, which copies only `pithon/`, and wheels, which exclude data dirs).
+  Never seed over an existing vault: a user who deletes a starter note must not get it back.
 - `data/briefings/YYYY-MM-DD.md` is append-only archive written by `BriefingStore`.
 - `data_dir` is derived from `dirname(DB_PATH)`, and notes now follow too: every production call site
   passes `base_dir=storage.notes_dir()` (a new `Storage` method). `base_dir=None` still falls back to

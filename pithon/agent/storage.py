@@ -19,6 +19,8 @@ class Storage:
         self.profile_store = ProfileStore(self.data_dir)
         self.tasks_store = TasksStore(self.data_dir)
         self.briefing_store = BriefingStore(self.data_dir)
+        from pithon.agent.memory import seed_notes
+        seed_notes(self.notes_dir())
         self._init_db()
 
     def _get_connection(self) -> sqlite3.Connection:

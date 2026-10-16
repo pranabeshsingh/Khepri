@@ -7,15 +7,63 @@ from datetime import datetime, timezone
 import zoneinfo
 from typing import Dict, Any, List, Optional
 
+from pithon.agent.markdown_store import atomic_write as _atomic_write
+
 logger = logging.getLogger("pithon.memory")
 
 DEFAULT_NOTES_DIR = "data/notes"
+
+# Starter notes written on first run only. data/ is gitignored, so anything
+# authored there never travels with the repo and silently drifts from the
+# shipped configuration on a fresh machine. Embedded as a Python constant
+# rather than an asset directory because the Dockerfiles copy only pithon/
+# and setuptools would not package a data dir -- this survives both.
+# The cgroup figures below mirror docker-compose.yml; personal fields are
+# left as placeholders for the operator to fill in.
+SEED_NOTES: Dict[str, str] = {
+    "system-specs.md": """# System Specifications
+
+<!-- Written by Khepri on first run. Edit freely; it is your note vault. -->
+
+- **Host Hardware**: <e.g. 4-core ARM (Cortex-A72) / 4 GB RAM>
+- **Khepri Runtime**: Qwen2.5-0.5B-Instruct GGUF (`Q4_K_M` quantized)
+- **Linux cgroups Isolation** (mirrors `docker-compose.yml`):
+  - `pithon-daemon`: 1.0 CPU, 1408M RAM
+  - `pithon-agent`: 0.5 CPU, 512M RAM
+  - Combined ceiling: 1920M (under the <2GB total runtime budget)
+- **Co-located Services**: <e.g. OwnTracks Recorder `:8083`, Mosquitto MQTT `:8883`>
+- **Default Timezone**: <e.g. Asia/Kolkata>
+"""
+}
 
 def get_notes_dir(base_dir: Optional[str] = None) -> str:
     """Ensure and return active notes directory."""
     target = base_dir or os.environ.get("NOTES_DIR", DEFAULT_NOTES_DIR)
     os.makedirs(target, exist_ok=True)
     return target
+
+
+def seed_notes(base_dir: Optional[str] = None) -> List[str]:
+    """Write starter notes when the notes vault is empty. Returns names written.
+
+    Only seeds a genuinely empty vault, so deleting a starter note is respected
+    and an existing installation is never modified.
+    """
+    target = get_notes_dir(base_dir)
+    try:
+        if os.listdir(target):
+            return []
+    except OSError:
+        pass
+    written: List[str] = []
+    for name, body in SEED_NOTES.items():
+        try:
+            _atomic_write(os.path.join(target, name), body)
+            written.append(name)
+            logger.info("Seeded starter note: %s", os.path.join(target, name))
+        except OSError as e:
+            logger.warning("Could not seed %s: %s", name, e)
+    return written
 
 def _slugify(text: str) -> str:
     slug = re.sub(r"[^a-zA-Z0-9_\-]+", "-", text.lower().strip()).strip("-")

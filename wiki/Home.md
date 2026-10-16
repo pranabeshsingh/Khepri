@@ -9,7 +9,7 @@ Welcome to the official **Khepri** Wiki. Khepri is an ultra-lightweight autonomo
 * **[Telegram Bot Setup](Telegram-Bot-Setup)** — Step-by-step guide to creating a bot via `@BotFather`, obtaining tokens, getting your Admin Chat ID, and registering slash commands.
 * **[Bot Commands & Tool Calling](Bot-Commands-and-Tools)** — Full reference of slash commands (`/chat`, `/pdf`, `/compress`, `/calendar`, `/tasks`, `/weather`, `/calc`, `/notes`, `/search`, `/status`), local edge OCR, fast-path routing, and lifecycle schedules.
 * **[Web Management Portal Guide](Web-Portal-Guide)** — Exploring the frosted glassmorphism dashboard, real-time telemetry, web chat, task kanban, and hybrid markdown file synchronization (`profile.md`, `tasks.md`, `briefings/`).
-* **[Architecture & Edge Deployment](Architecture-and-Deployment)** — 4GB Raspberry Pi 4 memory budget, C++ Tesseract OCR optimization, cgroup constraints, zero-swap ARM memory management, loopback security, and dual container layout.
+* **[Architecture & Edge Deployment](Architecture-and-Deployment)** — 4GB Raspberry Pi 4/5 memory budget, C++ Tesseract OCR optimization, cgroup constraints, zero-swap ARM memory management, loopback security, dual container layout, and the systemd bare-metal path.
 
 ---
 
