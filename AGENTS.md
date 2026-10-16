@@ -75,6 +75,29 @@ There is no `python` on `PATH`; system `python3` is 3.9 but the venv is 3.12.
 **Do not run `ruff format`.** It would rewrite 51 of 54 files. CI only ever runs `ruff check`
 (line-length 120 but `E501` ignored). There is no formatter in the toolchain.
 
+## Tool names are exact — do not invent them
+
+There is no MCP server in this project, so the tool catalog is small, fixed, and fully visible in the
+system prompt. Tool names are **exact identifiers**, not free text. Emitting a plausible-but-wrong name
+fails the call outright, which wastes a whole turn.
+
+Frequently hallucinated names and their real equivalents here:
+
+| Wrong (other harnesses) | Correct here |
+|---|---|
+| `shell_command`, `run_shell_command`, `Bash`, `terminal`, `run_command`, `execute_command` | `shell` (arg: `command`) |
+| `read_file`, `Read` | `read` (arg: `path`) |
+| `write_file`, `Write` | `write` (arg: `path`, `content`) |
+| `str_replace_editor`, `Edit` | `edit` (arg: `path`, `oldString`, `newString`) |
+| `search`, `find`, `codebase_search` | `grep` / `glob` / `subagent` |
+| `web_search`, `google` | `websearch` |
+| `web_fetch`, `fetch` | `webfetch` |
+
+`shell` takes `command`, plus optional `workdir`, `timeout`, and `background`. If a call is rejected
+as an unknown tool, re-read the catalog and retry with the correct name — do not paraphrase the task
+or fall back to guessing. Prefer `read`/`grep`/`glob` over `shell` for inspection; reach for `shell`
+only when you actually need to execute something.
+
 ## Hard constraints (violating these breaks the project's premise)
 
 1. **Two different memory numbers, deliberately.**
