@@ -112,7 +112,10 @@ branch in `tools.execute_tool_call` (it strips non-alphanumerics and maps `calen
   and `Storage.save_user_profile()`. Hand-edits are silently overwritten. They are output, not input.
 - `data/notes/*.md` **is** the real store for notes (`agent/memory.py`).
 - `data/briefings/YYYY-MM-DD.md` is append-only archive written by `BriefingStore`.
-- `data_dir` is derived from `dirname(DB_PATH)`, so changing `DB_PATH` relocates all markdown files too.
+- `data_dir` is derived from `dirname(DB_PATH)`, so changing `DB_PATH` relocates `profile.md`, `tasks.md`,
+  and `briefings/`. It does **not** relocate notes: `web.py` calls `list_notes()` / `save_note()` without
+  a `base_dir`, so notes always resolve to `$CWD/data/notes` unless you set `NOTES_DIR`. Verified: pointing
+  `DB_PATH` at a temp dir still reported the repo's real notes.
 - `get_user_profile()` falls back to `chat_id='web'`, and every profile write is mirrored to the `web` row.
 - Undocumented overrides: `DATA_DIR` (markdown store) and `NOTES_DIR` (notes). Neither is in `.env.example`.
 - `data/` and `models/` are gitignored — never commit notes, the DB, or GGUF weights.
