@@ -54,6 +54,9 @@ no bundler, and no template file.
 - `scripts/query_daemon.sh "prompt"` is the quickest operator probe: it streams SSE from
   `http://127.0.0.1:8090/v1/chat/completions` (override with `PITHON_PORT`). Note the default is the
   *host-mapped* 8090, not the container's 8080.
+- `scripts/install.sh` automates the bare-metal path (deps, venv, GGUF, `.env`, both units). It **inlines
+  its own copies** of the two unit files as heredocs instead of reading `scripts/*.service`, so edits to a
+  unit must be mirrored there by hand. It has not been run on real hardware.
 - `/api/playground` is a headless alias of `/api/chat/send` with no UI tab — useful for scripted model
   testing without driving the dashboard.
 

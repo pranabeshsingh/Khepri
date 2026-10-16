@@ -65,6 +65,11 @@ daemon serves the model over HTTP; the agent runs the Telegram bot, the schedule
 secrets relative to its `WorkingDirectory`, which must be the repo root. `scripts/pithon.service` is a
 superseded single unit kept for reference; do not enable it.
 
+`scripts/install.sh` automates this path end to end (deps, venv, GGUF weights, `.env`, both units). It
+**duplicates the unit templates** as heredocs rather than reading `scripts/*.service`, so the two copies
+must be kept in sync by hand — if you change a unit in `scripts/`, change the heredoc in `install.sh`
+too.
+
 ---
 
 ## Codebase Architecture

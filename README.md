@@ -246,7 +246,24 @@ Run a standalone loopback server:
 khepri serve --port 8080 --model models/qwen2.5-0.5b-instruct-q4_k_m.gguf
 ```
 
-### 4. Running as a systemd Service (Raspberry Pi 4/5)
+### 4. Automated Installer (Raspberry Pi 4/5 / Debian / Ubuntu)
+
+`scripts/install.sh` automates the whole bare-metal path: prerequisites, virtualenv, dependencies, GGUF
+weights, `.env`, and both systemd units.
+
+```bash
+./scripts/install.sh --bot-token <token> --admin-chat-id <id> --password <portal-passphrase>
+# Options: --timezone <tz>  --user <user>  --skip-model  --skip-services  --help
+```
+
+It reuses an existing `.env` for any values you don't pass, and skips the model download when the GGUF is
+already present. Runs as your user without `sudo` where possible (it only elevates for `apt` and writing
+`/etc/systemd/system`). **Not yet exercised on hardware** — review it before running on a Pi you care
+about.
+
+> If you prefer to install by hand, the manual sequence is below.
+
+### 5. Running as a systemd Service (Raspberry Pi 4/5)
 
 Khepri runs as **two separate processes**, so it needs **two** systemd units. The daemon serves the local
 LLM; the agent runs the Telegram bot, the background scheduler, and the web portal.
