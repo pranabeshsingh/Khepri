@@ -30,7 +30,7 @@
 
 ## Overview
 
-**Khepri** (*named after the ancient solar scarab rolling dawn intelligence*) is an ultra-lightweight autonomous AI runtime engineered for resource-constrained edge environments (Raspberry Pi 3/4/5) and low-resource cloud VPS instances (Oracle Cloud 2-core ARM Ampere A1, Hetzner, AWS Graviton).
+**Khepri** (*named after the ancient solar scarab rolling dawn intelligence*) is an ultra-lightweight autonomous AI runtime engineered for resource-constrained edge environments (Raspberry Pi 4/5) and low-resource cloud VPS instances (Oracle Cloud 2-core ARM Ampere A1, Hetzner, AWS Graviton).
 
 It pairs an in-memory **0.5B instruction-tuned SLM** with a full-fledged **personal agent**:
 * 🤖 **Telegram Assistant:** Whitelisted private bot with native tool calling, background scheduler, and hourly digests.

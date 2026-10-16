@@ -1,6 +1,6 @@
 # Architecture & Edge Deployment Guide
 
-Khepri is engineered from the ground up for strict resource budgeting on ARM edge devices (Raspberry Pi 3/4/5) and low-resource cloud VPS instances (e.g., Oracle Cloud 2-core ARM Ampere A1, Hetzner, AWS Graviton).
+Khepri is engineered from the ground up for strict resource budgeting on ARM edge devices (Raspberry Pi 4/5) and low-resource cloud VPS instances (e.g., Oracle Cloud 2-core ARM Ampere A1, Hetzner, AWS Graviton).
 
 ---
 

@@ -1,6 +1,6 @@
 # 🪲 Khepri Documentation Wiki
 
-Welcome to the official **Khepri** Wiki. Khepri is an ultra-lightweight autonomous Small Language Model (SLM) runtime and personal agent engineered specifically for ARM hardware (Raspberry Pi 3/4/5) and low-resource cloud VPS instances.
+Welcome to the official **Khepri** Wiki. Khepri is an ultra-lightweight autonomous Small Language Model (SLM) runtime and personal agent engineered specifically for ARM hardware (Raspberry Pi 4/5) and low-resource cloud VPS instances.
 
 ---
 
