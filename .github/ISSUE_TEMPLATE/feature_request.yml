@@ -25,7 +25,7 @@ body:
     id: memory-hardware-impact
     attributes:
       label: "Hardware & Memory Impact"
-      description: "How does this proposal fit into Khepri's low-resource edge target (Raspberry Pi 4 with <750MB RAM headroom)?"
+      description: "How does this proposal fit into Khepri's low-resource edge target (Raspberry Pi 4/5 with <2GB total runtime footprint)?"
     validations:
       required: false
   - type: textarea

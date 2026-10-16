@@ -16,12 +16,12 @@ services:
     # Enforce strict cgroup resource constraints
     # Cap CPU to 1 core max (out of 2 cores) so OwnTracks & host always have dedicated CPU
     cpus: 1.0
-    mem_limit: 2048m
+    mem_limit: 1408m
     deploy:
       resources:
         limits:
           cpus: "1.0"
-          memory: "2048M"
+          memory: "1408M"
         reservations:
           cpus: "0.2"
           memory: "512M"

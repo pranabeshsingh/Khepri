@@ -8,7 +8,7 @@
     <a href="https://github.com/pranabeshsingh/Khepri/actions/workflows/docker.yml"><img src="https://github.com/pranabeshsingh/Khepri/actions/workflows/docker.yml/badge.svg" alt="Docker Build CI" /></a>
     <a href="https://github.com/pranabeshsingh/Khepri/actions/workflows/security.yml"><img src="https://github.com/pranabeshsingh/Khepri/actions/workflows/security.yml/badge.svg" alt="Security Scan" /></a>
     <a href="https://github.com/pranabeshsingh/Khepri/actions/workflows/codeql.yml"><img src="https://github.com/pranabeshsingh/Khepri/actions/workflows/codeql.yml/badge.svg" alt="CodeQL" /></a>
-    <img src="https://img.shields.io/badge/RAM_Budget-%3C_550_MB_RSS-06b6d4" alt="RAM Budget" />
+    <img src="https://img.shields.io/badge/RAM_Budget-%3C_2_GB-06b6d4" alt="RAM Budget" />
     <img src="https://img.shields.io/badge/Python-3.10_%7C_3.11_%7C_3.12-38bdf8" alt="Python Versions" />
     <img src="https://img.shields.io/badge/License-Apache--2.0-fbbf24" alt="License" />
   </p>

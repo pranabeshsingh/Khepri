@@ -35,12 +35,12 @@ When co-located alongside mission-critical services like **OwnTracks Recorder**,
 
 | Service / Component | CPU Limit | RAM Hard Limit | Typical Live RSS | Volume Mounts |
 | :--- | :--- | :--- | :--- | :--- |
-| **`pithon-daemon`** | `1.0 CPU` (1 core) | `2048 MB` | ~306 MB | `./models:/app/models` |
+| **`pithon-daemon`** | `1.0 CPU` (1 core) | `1408 MB` | ~306 MB | `./models:/app/models` |
 | **`pithon-agent`** | `0.5 CPU` (half core) | `512 MB` | ~27 MB | `./data:/app/data` |
-| **Combined Containers** | `1.5 CPU` | `2560 MB` | **~333 MB** (<9% of 4GB Pi 4) | Shared network |
+| **Combined Containers** | `1.5 CPU` | `1920 MB` | **~333 MB** (<8% of 4GB Pi 4) | Shared network |
 
 ### Why This Architecture Excels on a 4GB Pi 4:
-1. **Host Memory Guarantee:** Combined container RSS is ~333 MiB, leaving >3.1 GB of RAM free for the host OS, desktop GUI, or companion Docker containers.
+1. **Host Memory Guarantee:** The combined cgroup ceiling is 1920 MiB — under the project's stated **< 2 GB total runtime budget** — while combined container RSS is only ~333 MiB, leaving >3.1 GB of RAM free for the host OS, desktop GUI, or companion Docker containers.
 2. **Zero Swap Thrashing:** Qwen2.5-0.5B runs fully memory-mapped in RAM, eliminating MicroSD read/write bottlenecks.
 3. **C++ Tesseract OCR vs Heavy ONNX/OpenCV:** Standard ONNX runtime and OpenCV model loading peaks over 500MB and causes OOM kills under tight cgroup limits. Khepri utilizes system C++ `tesseract-ocr` (~25MB package, ~20MB RAM) for instantaneous, crash-free OCR.
 4. **Deterministic Fast-Path Bypass:** High-frequency queries (Time, Agenda, Weather, AST Math) execute in <3ms without waking the LLM inference threads.

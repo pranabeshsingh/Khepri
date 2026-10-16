@@ -28,6 +28,6 @@ Closes #
 - [ ] Static type checking passes (`mypy pithon`)
 - [ ] Code formatting and linting pass (`ruff check pithon tests`)
 - [ ] Unit and integration tests pass (`pytest tests/ -m "not e2e" -v`)
-- [ ] Memory footprint verified to stay within Raspberry Pi limits (< 750MB process RSS for 0.5B models)
+- [ ] Memory footprint verified to stay within Raspberry Pi limits (total stack < 2 GB; daemon process RSS < 750 MB, which CI asserts)
 - [ ] Any new tools, endpoints, or CLI arguments are documented in `README.md` or `docs/`
 - [ ] Security boundaries preserved (path traversal containment, no arbitrary eval, auth verified)

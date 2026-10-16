@@ -1352,7 +1352,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 0.5rem;">
               <div style="padding: 0.85rem; background: rgba(10,14,26,0.6); border: 1px solid var(--border); border-radius: 0.65rem;">
                 <div style="font-size: 0.72rem; color: var(--text-muted);">khepri-daemon (C++)</div>
-                <div style="font-weight: 700; color: #a5b4fc; font-size: 0.95rem; margin-top: 0.2rem;">1.0 CPU • 2048M RAM</div>
+                <div style="font-weight: 700; color: #a5b4fc; font-size: 0.95rem; margin-top: 0.2rem;">1.0 CPU • 1408M RAM</div>
                 <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.2rem;">llama.cpp GGUF Q4_K_M</div>
               </div>
               <div style="padding: 0.85rem; background: rgba(10,14,26,0.6); border: 1px solid var(--border); border-radius: 0.65rem;">

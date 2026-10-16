@@ -77,10 +77,14 @@ There is no `python` on `PATH`; system `python3` is 3.9 but the venv is 3.12.
 
 ## Hard constraints (violating these breaks the project's premise)
 
-1. **Peak process RSS must stay < 750 MB** with the 0.5B model loaded. Enforced by a `resource.getrusage`
-   assertion in `.github/workflows/benchmark.yml` and by the PR checklist. (The README badge claims
-   < 550 MB; the enforced number is 750 MB. `wiki/Architecture-*-Deployment.md` quotes a ~333 MB combined
-   figure. Reconcile before changing any of them.)
+1. **Two different memory numbers, deliberately.**
+   - **Stated system budget: < 2 GB** for the whole stack (daemon + agent with a 0.5B model loaded).
+     This is the product claim — README badge, CONTRIBUTING, PR template, wiki, and the compose cgroup
+     caps, which sum to 1920 MB (1408M daemon + 512M agent).
+   - **CI guard: daemon process < 750 MB peak RSS** (`benchmark.yml` asserts it; `test_e2e_real_model.py`
+     uses a 400/850 MB ceiling by model size). This is a regression guard, *not* the public budget.
+     Do not relax it to 2 GB — that would make a real leak pass CI.
+   Quoted "typical live RSS" (~306 MB daemon, ~27 MB agent, ~333 MB combined) is measured, not a limit.
 2. **Raspberry Pi 4/5, 4 GB minimum.** Pi 3 references were purged on 2026-10-16; do not reintroduce
    them in help text, service units, docs, or wiki pages.
 3. **`pithon/` core is stdlib-only.** No Flask/FastAPI, no `requests`, no `python-telegram-bot`,

@@ -70,7 +70,7 @@ pip install --prefer-binary --extra-index-url https://abetlen.github.io/llama-cp
 ## Hardware & Performance Constraints
 
 Khepri is targeted at single-board computers with constrained RAM. All contributions must respect our performance budgets:
-1. **RAM Footprint:** The complete runtime (with a 0.5B quantized GGUF model loaded) must maintain a peak resident memory (RSS) of **< 750 MB**.
+1. **System Memory Budget:** the complete stack (daemon + agent, with a 0.5B quantized GGUF model loaded) must stay under **2 GB** in total. The compose cgroup caps are sized to match (1408M + 512M = 1920M). Separately, the **daemon process alone is CI-gated tighter at < 750 MB peak RSS** in `.github/workflows/benchmark.yml` — that assertion is the regression guard and should not be relaxed to match the 2 GB headline.
 2. **Deterministic Fallbacks:** Fast-path operations (math, time queries, device stats) should bypass LLM inference entirely using deterministic regex routers.
 3. **No Unbounded Memory Leaks:** Web and bot sessions must be bounded and garbage-collectible.
 

@@ -78,7 +78,10 @@ jobs:
           print(f'Response excerpt: {full_response.strip()[:120]}...')
           print('----------------------------------------------------')
 
-          # Validate Raspberry Pi 4 hardware constraint (< 750MB process RSS for 0.5B)
+          # Regression guard for the DAEMON PROCESS only. This is deliberately
+          # tighter than the project's stated <2GB total system budget
+          # (1408M daemon + 512M agent = 1920MB in docker-compose.yml).
+          # Do not relax this to match the 2GB headline.
           assert max_rss_mb < 750.0, f'Memory footprint exceeded 750MB threshold: {max_rss_mb:.2f}MB'
           assert tok_per_sec > 5.0, f'Inference speed below 5 tok/s on ARM: {tok_per_sec:.2f} tok/s'
           print('>>> PASSED: Memory and latency verified for 4GB Pi 4 deployment.')
