@@ -52,6 +52,19 @@ pip install --prefer-binary --extra-index-url https://abetlen.github.io/llama-cp
 
 > **Note on `llama-cpp-python`:** PyPI only provides source archives for `llama-cpp-python`. Specifying `--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu` allows `pip` to install official, optimized prebuilt wheels for your architecture (`linux_x86_64`, `manylinux2014_aarch64`, or `macosx_arm64`), saving 20+ minutes of local compilation.
 
+### Running on a Raspberry Pi (systemd)
+
+There are two deploy paths, and both are supported:
+
+- **Docker Compose** — two containers (`pithon` daemon on 8090, `pithon-agent` on 8091).
+- **Bare metal + systemd** — see `scripts/pithon-daemon.service` and `scripts/pithon-agent.service`.
+
+The bare-metal path needs **both** units, because the SLM daemon and the agent are separate processes. The
+daemon serves the model over HTTP; the agent runs the Telegram bot, the scheduler, and the web portal. Set
+`User=` and the checkout paths in each unit before installing, and `chmod 600 .env` — the agent loads
+secrets relative to its `WorkingDirectory`, which must be the repo root. `scripts/pithon.service` is a
+superseded single unit kept for reference; do not enable it.
+
 ---
 
 ## Codebase Architecture

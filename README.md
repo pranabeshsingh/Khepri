@@ -246,6 +246,36 @@ Run a standalone loopback server:
 khepri serve --port 8080 --model models/qwen2.5-0.5b-instruct-q4_k_m.gguf
 ```
 
+### 4. Running as a systemd Service (Raspberry Pi 4/5)
+
+Khepri runs as **two separate processes**, so it needs **two** systemd units. The daemon serves the local
+LLM; the agent runs the Telegram bot, the background scheduler, and the web portal.
+
+```bash
+# 1. Edit both units first: set User= and the /home/<you>/code/Khepri paths to your checkout
+nano scripts/pithon-daemon.service
+nano scripts/pithon-agent.service
+
+# 2. Protect your secrets (the agent reads .env relative to its WorkingDirectory)
+chmod 600 .env
+
+# 3. Install and start the daemon first, then the agent
+sudo cp scripts/pithon-daemon.service scripts/pithon-agent.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now pithon-daemon.service
+sudo systemctl enable --now pithon-agent.service
+
+# 4. Verify
+curl http://127.0.0.1:8090/health   # OpenAI-compatible daemon API
+curl http://127.0.0.1:8091/         # Web portal (login required)
+```
+
+> **Port note:** the shipped units serve the daemon on **8090** (matching Docker Compose and
+> `scripts/query_daemon.sh`), not the `khepri serve` default of 8080. The agent unit sets
+> `PITHON_DAEMON_URL=http://127.0.0.1:8090` to match — change both if you prefer 8080.
+
+`scripts/pithon.service` is a superseded single unit kept for reference only; do not enable it.
+
 ---
 
 ## Testing & Quality Assurance
