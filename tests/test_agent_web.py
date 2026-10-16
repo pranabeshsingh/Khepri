@@ -16,17 +16,19 @@ def temp_storage(tmp_path):
 
 @pytest.fixture
 def web_server(temp_storage):
-    port = 18091
+    # Bind to an ephemeral port (0) so the suite never collides with a stray
+    # listener on a previously hardcoded port. HTTPServer binds and activates in
+    # __init__, so server_port is populated immediately.
     server = create_web_server(
         storage=temp_storage,
         admin_password="test-password-123",
         host="127.0.0.1",
-        port=port,
+        port=0,
         daemon_url="http://127.0.0.1:8090"
     )
     t = threading.Thread(target=server.serve_forever, daemon=True)
     t.start()
-    yield f"http://127.0.0.1:{port}"
+    yield f"http://127.0.0.1:{server.server_port}"
     server.shutdown()
     server.server_close()
 
