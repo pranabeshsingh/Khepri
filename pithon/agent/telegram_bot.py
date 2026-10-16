@@ -53,6 +53,7 @@ class TelegramBot:
         self.admin_chat_id = str(admin_chat_id).strip()
         self.report_chat_id = str(report_chat_id).strip()
         self.storage = storage
+        self.notes_dir = storage.notes_dir() if storage else None
         self.daemon_url = daemon_url.rstrip("/")
         self.tz_name = tz_name
         self.api_base = f"https://api.telegram.org/bot{self.token}"
@@ -318,7 +319,7 @@ class TelegramBot:
             if not title:
                 title = "Image OCR Note"
             from pithon.agent.memory import save_note
-            saved = save_note(title, extracted_text, tags="ocr,image", tz_name=self.tz_name)
+            saved = save_note(title, extracted_text, tags="ocr,image", tz_name=self.tz_name, base_dir=self.notes_dir)
             self.send_message(chat_id, f"📝 *Saved Note from Image:*\nTitle: `{saved['title']}`\n\n```\n{extracted_text[:400]}\n```")
             return
 
@@ -617,7 +618,7 @@ class TelegramBot:
             return
 
         if text.startswith("/notes"):
-            notes = list_notes()
+            notes = list_notes(base_dir=self.notes_dir)
             if not notes:
                 self.send_message(chat_id, "📝 No saved notes. Send 'Remember that...' or `/note <title> <text>` to save.")
             else:
@@ -633,7 +634,7 @@ class TelegramBot:
             title = parts[0]
             content = parts[1] if len(parts) > 1 else ""
             if title and content:
-                note_res = save_note(title, content, tz_name=self.tz_name)
+                note_res = save_note(title, content, tz_name=self.tz_name, base_dir=self.notes_dir)
                 self.send_message(chat_id, f"📝 Saved note *{title}* (`{note_res.get('filename')}`)")
             else:
                 self.send_message(chat_id, "Usage: `/note <title> <content>`")

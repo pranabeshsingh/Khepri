@@ -124,6 +124,15 @@ class Storage:
             if "calendar_synced_at" not in cols:
                 conn.execute("ALTER TABLE user_profiles ADD COLUMN calendar_synced_at TIMESTAMP NULL;")
 
+    def notes_dir(self) -> str:
+        """Notes directory, colocated with the DB so notes follow DB_PATH.
+
+        With the default DB_PATH ('data/pithon.db') this resolves to 'data/notes',
+        identical to memory.DEFAULT_NOTES_DIR. Passing base_dir=None to the memory
+        helpers keeps their NOTES_DIR env / default fallback intact.
+        """
+        return os.path.join(self.data_dir, "notes")
+
     def get_table_names(self) -> List[str]:
         """Return list of existing tables."""
         with self._lock, self._get_connection() as conn:

@@ -211,7 +211,7 @@ def test_command_task_and_note_and_search(bot, mock_storage, tmp_path):
     }
     with patch("pithon.agent.telegram_bot.save_note", return_value={"filename": "server-ip.md"}) as mock_save,          patch.object(bot, "send_message") as mock_send:
         bot.handle_message(msg_note)
-        mock_save.assert_called_once_with("server-ip", "192.168.1.100", tz_name="Asia/Kolkata")
+        mock_save.assert_called_once_with("server-ip", "192.168.1.100", tz_name="Asia/Kolkata", base_dir=mock_storage.notes_dir())
         mock_send.assert_called_once()
         assert "Saved note" in mock_send.call_args[0][1]
 

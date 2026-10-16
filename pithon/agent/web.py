@@ -2687,6 +2687,8 @@ def create_web_server(
 ) -> HTTPServer:
     """Create HTTP Server instance with session authentication, multi-turn context memory, and Telegram chat sync."""
 
+    notes_dir = storage.notes_dir() if storage else None
+
     class KhepriWebHandler(BaseHTTPRequestHandler):
         def _get_cookie_session(self) -> Optional[str]:
             cookie_hdr = self.headers.get("Cookie", "")
@@ -2772,7 +2774,7 @@ def create_web_server(
                 interactions = storage.get_interactions(limit=100) if storage else []
                 tasks_all = storage.get_tasks(include_completed=True) if storage else []
                 tasks_pending = [t for t in tasks_all if not t.get("is_completed")]
-                notes = list_notes()
+                notes = list_notes(base_dir=notes_dir)
                 telemetry = get_system_telemetry(daemon_url)
                 self._send_json({
                     "status": "ok",
@@ -2824,9 +2826,9 @@ def create_web_server(
                 self._send_json(tasks)
 
             elif path == "/api/notes":
-                notes_list = list_notes()
+                notes_list = list_notes(base_dir=notes_dir)
                 for n in notes_list:
-                    n["content"] = get_note_content(n["filename"])
+                    n["content"] = get_note_content(n["filename"], base_dir=notes_dir)
                 self._send_json(notes_list)
 
             elif path == "/api/profile":
@@ -2941,7 +2943,7 @@ def create_web_server(
                 content = body.get("content", "").strip()
                 tags = body.get("tags", "").strip() or None
                 if title and content:
-                    res = save_note(title, content, tags=tags, tz_name=tz_name)
+                    res = save_note(title, content, tags=tags, tz_name=tz_name, base_dir=notes_dir)
                     self._send_json({"status": "ok", "note": res})
                 else:
                     self._send_json({"error": "Title and content required"}, status=400)
@@ -2950,7 +2952,7 @@ def create_web_server(
                 body = self._read_json_body()
                 filename = os.path.basename(body.get("filename", "").strip())
                 if filename:
-                    deleted = delete_note(filename)
+                    deleted = delete_note(filename, base_dir=notes_dir)
                     self._send_json({"status": "ok", "deleted": deleted})
                 else:
                     self._send_json({"error": "Filename required"}, status=400)
@@ -3185,7 +3187,7 @@ def create_web_server(
                     ntitle = parts[0]
                     ncontent = parts[1] if len(parts) > 1 else ""
                     if ntitle and ncontent:
-                        nres = save_note(ntitle, ncontent, tz_name=tz_name)
+                        nres = save_note(ntitle, ncontent, tz_name=tz_name, base_dir=notes_dir)
                         reply_text = f"📝 Saved note *{ntitle}* (`{nres.get('filename')}`)"
                     else:
                         reply_text = "Usage: `/note <title> <content>`"

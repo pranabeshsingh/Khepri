@@ -324,16 +324,16 @@ def execute_tool_call(
     elif name == "save_note":
         title = str(args.get("title", "Note")).strip()
         content = str(args.get("content", "")).strip()
-        note_res = save_note(title, content, tz_name=tz_name)
+        note_res = save_note(title, content, tz_name=tz_name, base_dir=(storage.notes_dir() if storage else None))
         action_verb = "Updated" if note_res.get("updated") else "Saved"
         msg = f"📝 *{action_verb} note:* `{note_res['filename']}`\n📌 *{title}*\n\n{content}"
         return msg, None, {"type": "note", "filename": note_res["filename"]}
 
     elif name == "search_notes":
         query = str(args.get("query", "")).strip()
-        notes = search_notes(query)
+        notes = search_notes(query, base_dir=(storage.notes_dir() if storage else None))
         if not notes:
-            all_n = list_notes()
+            all_n = list_notes(base_dir=(storage.notes_dir() if storage else None))
             if not all_n:
                 return f"No notes found matching '{query}'. Zero notes saved.", None, None
             titles = ", ".join(f"`{n['title']}`" for n in all_n[:5])

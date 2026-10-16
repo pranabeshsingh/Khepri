@@ -27,6 +27,7 @@ class Scheduler:
     ):
         self.bot = bot
         self.storage = storage
+        self.notes_dir = storage.notes_dir() if storage else None
         self.admin_chat_id = str(admin_chat_id).strip()
         self.report_chat_id = str(report_chat_id).strip()
         self.tz_name = tz_name
@@ -273,7 +274,8 @@ class Scheduler:
             title=f"daily-summary-{yesterday}",
             content=summary_text,
             tags="daily-summary,compactor,memory",
-            tz_name=self.tz_name
+            tz_name=self.tz_name,
+            base_dir=self.notes_dir
         )
         logger.info(f"Nightly compactor saved summary for {yesterday}")
         return summary_text

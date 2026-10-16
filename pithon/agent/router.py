@@ -131,7 +131,7 @@ def route_fast_path(
     # 5. Notes Search Intent
     search_q = is_notes_search_intent(clean)
     if search_q:
-        results = search_notes(search_q)
+        results = search_notes(search_q, base_dir=(storage.notes_dir() if storage else None))
         if not results:
             reply = f"📝 No saved notes matching *'{search_q}'*."
         else:
