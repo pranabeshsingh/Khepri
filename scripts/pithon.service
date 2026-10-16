@@ -1,5 +1,5 @@
 [Unit]
-Description=Pithon Local SLM Daemon (Raspberry Pi 3)
+Description=Pithon Local SLM Daemon (Raspberry Pi 4/5)
 After=network.target
 
 [Service]

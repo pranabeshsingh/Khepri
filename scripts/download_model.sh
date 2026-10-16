@@ -1,5 +1,5 @@
 #!/bin/bash
-# Download GGUF models for Pithon (Raspberry Pi 3 and CI)
+# Download GGUF models for Pithon (Raspberry Pi 4/5 and CI)
 # Usage: ./scripts/download_model.sh [qwen|smollm|all] [destination_dir]
 set -euo pipefail
 

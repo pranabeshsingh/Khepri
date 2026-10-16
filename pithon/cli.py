@@ -14,7 +14,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Construct command-line argument parser."""
     parser = argparse.ArgumentParser(
         prog="pithon",
-        description="Pithon: Ultra-lightweight SLM runtime for Raspberry Pi 3"
+        description="Pithon: Ultra-lightweight SLM runtime for Raspberry Pi 4/5"
     )
     
     subparsers = parser.add_subparsers(dest="subcommand", help="Operational mode")

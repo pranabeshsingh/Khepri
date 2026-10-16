@@ -12,7 +12,7 @@ def run_chat(engine: Any, preset: str = "default") -> int:
     model_type = getattr(engine, "model_type", "qwen")
 
     print("\n" + "=" * 55)
-    print("  Pithon Local Chat (Raspberry Pi 3 SLM)")
+    print("  Pithon Local Chat (Raspberry Pi 4/5 SLM)")
     print(f"  Preset: {preset}")
     print("  Commands: /clear (reset conversation), /exit (quit)")
     print("=" * 55 + "\n")
