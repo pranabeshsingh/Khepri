@@ -121,7 +121,7 @@ jobs:
 
       - name: Extract metadata for pithon-daemon
         id: meta-daemon
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository_owner }}/pithon-daemon
           tags: |
@@ -144,7 +144,7 @@ jobs:
 
       - name: Extract metadata for pithon-agent
         id: meta-agent
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository_owner }}/pithon-agent
           tags: |
